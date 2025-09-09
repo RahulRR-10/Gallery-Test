@@ -5,7 +5,7 @@ A complete AI-powered photo search system that runs 100% locally on your device.
 ## 🚀 Features
 
 - **🧠 Semantic Search**: CLIP embeddings for natural language understanding
-- **🎯 Object Detection**: YOLO model detects 80+ object categories  
+- **🎯 Object Detection**: YOLO model detects 80+ object categories
 - **👤 Face Detection**: OpenCV + face_recognition for people identification
 - **🔒 Privacy-First**: All processing happens locally (no cloud required)
 - **⚡ Real-Time**: Instant search results with similarity scoring
@@ -30,6 +30,7 @@ A complete AI-powered photo search system that runs 100% locally on your device.
 ## 🎮 Quick Start
 
 ### 1. Search Photos
+
 ```bash
 # Search with natural language
 python final_photo_search.py --search "red flower"
@@ -44,6 +45,7 @@ python final_photo_search.py --stats
 ```
 
 ### 2. Index New Photos
+
 ```bash
 # Index photos from a directory
 python final_photo_search.py --index sample_photos
@@ -53,6 +55,7 @@ python auto_photo_search.py --watch
 ```
 
 ### 3. Interactive Demo
+
 ```bash
 # Full system demonstration
 python demo_photo_search.py
@@ -64,11 +67,13 @@ python auto_photo_search.py
 ## 🔧 How It Works
 
 ### AI Models Used
+
 - **CLIP**: OpenAI ViT-B/32 (151M parameters) for image-text embeddings
 - **YOLO**: YOLOv8n for real-time object detection (80 categories)
 - **Face Detection**: OpenCV Haar cascades + face_recognition
 
 ### Search Process
+
 1. **Indexing**: Extract 512-dimensional CLIP embeddings for each photo
 2. **Object Detection**: Identify objects using YOLO (person, car, etc.)
 3. **Face Detection**: Find and encode faces in photos
@@ -86,13 +91,13 @@ python auto_photo_search.py
 
 ## 🎯 Search Examples
 
-| Query | Best Results |
-|-------|-------------|
-| `"motorcycle racing sport"` | motorbike_0223.jpg, motorbike_0221.jpg |
-| `"person wearing tie formal"` | person_0808.jpg, person_0807.jpg |
-| `"beautiful flower garden"` | flower_0716.jpg, flower_0715.jpg |
-| `"delicious food dessert"` | fruit_0006.jpg (cake detected) |
-| `"colorful nature outdoor"` | flower_0716.jpg (potted plant) |
+| Query                         | Best Results                           |
+| ----------------------------- | -------------------------------------- |
+| `"motorcycle racing sport"`   | motorbike_0223.jpg, motorbike_0221.jpg |
+| `"person wearing tie formal"` | person_0808.jpg, person_0807.jpg       |
+| `"beautiful flower garden"`   | flower_0716.jpg, flower_0715.jpg       |
+| `"delicious food dessert"`    | fruit_0006.jpg (cake detected)         |
+| `"colorful nature outdoor"`   | flower_0716.jpg (potted plant)         |
 
 ## 🛠️ System Requirements
 
@@ -123,7 +128,3 @@ python auto_photo_search.py
 3. **Natural Language**: Use descriptive queries like "happy person"
 4. **Be Specific**: "red sports car" works better than just "car"
 5. **Check Objects**: Use `--stats` to see detected object categories
-
-
-
-
