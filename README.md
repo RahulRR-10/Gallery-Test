@@ -126,4 +126,4 @@ python auto_photo_search.py
 
 
 
-**Enjoy searching your photos with AI! 🚀**
+
