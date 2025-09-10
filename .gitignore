@@ -58,7 +58,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
+.venv311/
 # IDE and editor files
 .vscode/
 .idea/

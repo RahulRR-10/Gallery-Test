@@ -75,6 +75,47 @@ class PhotoDatabase:
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_exif_timestamp ON photos(exif_timestamp)
             ''')
+
+            # Stage 2: Faces table (per-face records)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS faces (
+                    id TEXT PRIMARY KEY,
+                    photo_id TEXT NOT NULL,
+                    bbox TEXT NOT NULL,
+                    embedding BLOB,
+                    method TEXT,
+                    cluster_id TEXT,
+                    created_at TEXT,
+                    FOREIGN KEY(photo_id) REFERENCES photos(id)
+                )
+            ''')
+
+            # Stage 2: Face clusters (labels and counts)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS face_clusters (
+                    cluster_id TEXT PRIMARY KEY,
+                    label TEXT,
+                    num_faces INTEGER DEFAULT 0,
+                    updated_at TEXT
+                )
+            ''')
+
+            # Stage 2: Relationships (co-occurrence of clusters)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS relationships (
+                    cluster_id_a TEXT NOT NULL,
+                    cluster_id_b TEXT NOT NULL,
+                    count INTEGER DEFAULT 0,
+                    weight REAL DEFAULT 0,
+                    PRIMARY KEY (cluster_id_a, cluster_id_b)
+                )
+            ''')
+
+            # Indexes for Stage 2 tables
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_faces_cluster ON faces(cluster_id)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_rel_a ON relationships(cluster_id_a)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_rel_b ON relationships(cluster_id_b)')
             
             conn.commit()
             conn.close()
@@ -329,6 +370,51 @@ class PhotoDatabase:
         except Exception as e:
             print(f"❌ Error retrieving photo {photo_id}: {e}")
             return None
+
+    def get_photo_by_path(self, path: str) -> Optional[dict]:
+        """Lookup a photo row by path (handles both relative and absolute paths)."""
+        try:
+            import os as _os
+            canon = _os.path.abspath(path)
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Try exact match first
+            cursor.execute('''
+                SELECT id, path, timestamp, exif_timestamp, file_size, image_width, image_height, 
+                       created_date, exif_date, indexed_date
+                FROM photos WHERE path = ?
+            ''', (canon,))
+            row = cursor.fetchone()
+            
+            # If not found, try case-insensitive filename match
+            if not row:
+                filename = _os.path.basename(canon)
+                cursor.execute('''
+                    SELECT id, path, timestamp, exif_timestamp, file_size, image_width, image_height, 
+                           created_date, exif_date, indexed_date
+                    FROM photos WHERE LOWER(path) LIKE LOWER(?)
+                ''', (f'%{filename}',))
+                row = cursor.fetchone()
+            
+            conn.close()
+            if row:
+                return {
+                    'id': row[0],
+                    'path': row[1],
+                    'timestamp': row[2],
+                    'exif_timestamp': row[3],
+                    'file_size': row[4],
+                    'image_width': row[5],
+                    'image_height': row[6],
+                    'created_date': row[7],
+                    'exif_date': row[8],
+                    'indexed_date': row[9]
+                }
+            return None
+        except Exception as e:
+            print(f"❌ Error retrieving photo by path {path}: {e}")
+            return None
     
     def search_photos_by_time(self, start_timestamp: Optional[int] = None, 
                              end_timestamp: Optional[int] = None,
@@ -486,6 +572,253 @@ class PhotoDatabase:
         except Exception as e:
             print(f"❌ Error clearing database: {e}")
             return False
+
+    # =====================
+    # Stage 2: Faces & People
+    # =====================
+
+    def insert_face(self, face_id: str, photo_id: str, bbox: str, embedding: Optional[np.ndarray], method: Optional[str]) -> bool:
+        """Insert a face record."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            embedding_blob = self.serialize_embedding(embedding) if isinstance(embedding, np.ndarray) else None
+            created_at = datetime.now().isoformat()
+            cursor.execute('''
+                INSERT OR REPLACE INTO faces (id, photo_id, bbox, embedding, method, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (face_id, photo_id, bbox, embedding_blob, method, created_at))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"❌ Error inserting face {face_id}: {e}")
+            return False
+
+    def get_faces_by_photo(self, photo_id: str) -> List[dict]:
+        """Get all faces for a photo."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, bbox, embedding, method, cluster_id FROM faces WHERE photo_id = ?', (photo_id,))
+            rows = cursor.fetchall()
+            conn.close()
+            results = []
+            for fid, bbox, emb_blob, method, cluster_id in rows:
+                embedding = self.deserialize_embedding(emb_blob) if emb_blob else None
+                results.append({'id': fid, 'bbox': bbox, 'embedding': embedding, 'method': method, 'cluster_id': cluster_id})
+            return results
+        except Exception as e:
+            print(f"❌ Error retrieving faces for photo {photo_id}: {e}")
+            return []
+
+    def get_all_face_embeddings(self) -> List[Tuple[str, np.ndarray]]:
+        """Return (face_id, embedding) for all faces with embeddings."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, embedding FROM faces WHERE embedding IS NOT NULL')
+            rows = cursor.fetchall()
+            conn.close()
+            results = []
+            for fid, emb_blob in rows:
+                try:
+                    embedding = self.deserialize_embedding(emb_blob)
+                    if isinstance(embedding, np.ndarray):
+                        results.append((fid, embedding.astype(np.float32)))
+                except Exception:
+                    continue
+            return results
+        except Exception as e:
+            print(f"❌ Error retrieving face embeddings: {e}")
+            return []
+
+    def assign_cluster_to_faces(self, cluster_id: str, face_ids: List[str]) -> None:
+        """Assign a cluster_id to given face_ids and update cluster counts."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.executemany('UPDATE faces SET cluster_id = ? WHERE id = ?', [(cluster_id, fid) for fid in face_ids])
+            # Update cluster count
+            cursor.execute('SELECT COUNT(*) FROM faces WHERE cluster_id = ?', (cluster_id,))
+            num = cursor.fetchone()[0]
+            updated_at = datetime.now().isoformat()
+            cursor.execute('''
+                INSERT INTO face_clusters (cluster_id, num_faces, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(cluster_id)
+                DO UPDATE SET num_faces=excluded.num_faces, updated_at=excluded.updated_at
+            ''', (cluster_id, num, updated_at))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"❌ Error assigning cluster {cluster_id}: {e}")
+
+    def get_unclustered_faces_with_embeddings(self) -> List[Tuple[str, str, np.ndarray]]:
+        """Return (face_id, photo_id, embedding) for faces without cluster and with embeddings."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, photo_id, embedding FROM faces WHERE cluster_id IS NULL AND embedding IS NOT NULL')
+            rows = cursor.fetchall()
+            conn.close()
+            results = []
+            for fid, pid, emb_blob in rows:
+                try:
+                    emb = self.deserialize_embedding(emb_blob)
+                    results.append((fid, pid, emb.astype(np.float32)))
+                except Exception:
+                    continue
+            return results
+        except Exception as e:
+            print(f"❌ Error retrieving unclustered faces: {e}")
+            return []
+
+    def get_cluster_centroids(self) -> List[Tuple[str, np.ndarray, int]]:
+        """Return (cluster_id, centroid_embedding, count)."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT DISTINCT cluster_id FROM faces WHERE cluster_id IS NOT NULL')
+            clusters = [r[0] for r in cursor.fetchall() if r[0]]
+            centroids: List[Tuple[str, np.ndarray, int]] = []
+            for cid in clusters:
+                cursor.execute('SELECT embedding FROM faces WHERE cluster_id = ? AND embedding IS NOT NULL', (cid,))
+                embs = []
+                for (emb_blob,) in cursor.fetchall():
+                    try:
+                        embs.append(self.deserialize_embedding(emb_blob).astype(np.float32))
+                    except Exception:
+                        continue
+                if embs:
+                    import numpy as _np
+                    mat = _np.stack(embs).astype(_np.float32)
+                    # L2-normalize then average then renormalize
+                    mat = mat / ( _np.linalg.norm(mat, axis=1, keepdims=True) + 1e-8 )
+                    centroid = mat.mean(axis=0)
+                    centroid = centroid / ( _np.linalg.norm(centroid) + 1e-8 )
+                    centroids.append((cid, centroid, len(embs)))
+            conn.close()
+            return centroids
+        except Exception as e:
+            print(f"❌ Error computing cluster centroids: {e}")
+            return []
+
+    def upsert_cluster(self, cluster_id: str, label: Optional[str] = None) -> None:
+        """Create or update a cluster record."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            updated_at = datetime.now().isoformat()
+            cursor.execute('''
+                INSERT INTO face_clusters (cluster_id, label, num_faces, updated_at)
+                VALUES (?, ?, COALESCE((SELECT COUNT(*) FROM faces WHERE cluster_id = ?),0), ?)
+                ON CONFLICT(cluster_id)
+                DO UPDATE SET label=excluded.label, num_faces=excluded.num_faces, updated_at=excluded.updated_at
+            ''', (cluster_id, label, cluster_id, updated_at))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"❌ Error upserting cluster {cluster_id}: {e}")
+
+    def label_cluster(self, cluster_id: str, label: str) -> None:
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            updated_at = datetime.now().isoformat()
+            cursor.execute('UPDATE face_clusters SET label = ?, updated_at = ? WHERE cluster_id = ?', (label, updated_at, cluster_id))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"❌ Error labeling cluster {cluster_id}: {e}")
+
+    def get_clusters(self) -> List[dict]:
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT cluster_id, label, num_faces, updated_at FROM face_clusters ORDER BY num_faces DESC')
+            rows = cursor.fetchall()
+            conn.close()
+            return [{'cluster_id': r[0], 'label': r[1], 'num_faces': r[2], 'updated_at': r[3]} for r in rows]
+        except Exception as e:
+            print(f"❌ Error retrieving clusters: {e}")
+            return []
+
+    def get_cluster_by_label(self, label: str) -> Optional[dict]:
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT cluster_id, label, num_faces FROM face_clusters WHERE label = ?', (label,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                return {'cluster_id': row[0], 'label': row[1], 'num_faces': row[2]}
+            return None
+        except Exception as e:
+            print(f"❌ Error getting cluster by label '{label}': {e}")
+            return None
+
+    def build_relationships_from_photos(self) -> None:
+        """Compute co-occurrence relationships between clusters from per-photo faces."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            # Get all photo_ids
+            cursor.execute('SELECT id FROM photos')
+            photos = [r[0] for r in cursor.fetchall()]
+            from itertools import combinations
+            rel_counts = {}
+            for pid in photos:
+                cursor.execute('SELECT DISTINCT cluster_id FROM faces WHERE photo_id = ? AND cluster_id IS NOT NULL', (pid,))
+                clusters = [r[0] for r in cursor.fetchall() if r[0]]
+                clusters = sorted(set(clusters))
+                for a, b in combinations(clusters, 2):
+                    key = (a, b)
+                    rel_counts[key] = rel_counts.get(key, 0) + 1
+            # Upsert relationships
+            for (a, b), cnt in rel_counts.items():
+                weight = float(cnt)
+                cursor.execute('''
+                    INSERT INTO relationships (cluster_id_a, cluster_id_b, count, weight)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(cluster_id_a, cluster_id_b)
+                    DO UPDATE SET count=excluded.count, weight=excluded.weight
+                ''', (a, b, cnt, weight))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"❌ Error building relationships: {e}")
+
+    def get_related_clusters(self, cluster_id: str, top_k: int = 10) -> List[Tuple[str, float]]:
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT cluster_id_b, weight FROM relationships WHERE cluster_id_a = ? ORDER BY weight DESC LIMIT ?', (cluster_id, top_k))
+            rows1 = cursor.fetchall()
+            cursor.execute('SELECT cluster_id_a, weight FROM relationships WHERE cluster_id_b = ? ORDER BY weight DESC LIMIT ?', (cluster_id, top_k))
+            rows2 = cursor.fetchall()
+            conn.close()
+            results = rows1 + rows2
+            return results
+        except Exception as e:
+            print(f"❌ Error getting related clusters: {e}")
+            return []
+
+    def get_photos_with_clusters(self, cluster_ids: List[str]) -> List[str]:
+        """Return photo_ids that contain any of the cluster_ids."""
+        if not cluster_ids:
+            return []
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            qmarks = ','.join('?' for _ in cluster_ids)
+            cursor.execute(f'SELECT DISTINCT photo_id FROM faces WHERE cluster_id IN ({qmarks})', tuple(cluster_ids))
+            rows = cursor.fetchall()
+            conn.close()
+            return [r[0] for r in rows]
+        except Exception as e:
+            print(f"❌ Error getting photos with clusters: {e}")
+            return []
 
 
 def test_database():
