@@ -860,6 +860,9 @@ Examples:
   python final_photo_search.py --index ./photos           # Index all photos
   python final_photo_search.py --search "red flower"      # Search for red flowers
   python final_photo_search.py --search "person smiling"  # Search for people
+  python final_photo_search.py --person "Alice"           # Photos with Alice
+  python final_photo_search.py --person "Alice" --person "Bob"  # Photos with BOTH Alice and Bob
+  python final_photo_search.py --person "Alice" --search "beach"  # Alice at the beach
   python final_photo_search.py --stats                    # Show database stats
         """
     )
@@ -893,8 +896,8 @@ Examples:
                        help='Assign a label to a cluster id')
     parser.add_argument('--rebuild-relationships', action='store_true',
                        help='Recompute co-occurrence relationships between clusters')
-    parser.add_argument('--person', type=str, metavar='NAME',
-                       help='Filter search to photos containing a labeled person')
+    parser.add_argument('--person', type=str, metavar='NAME', action='append',
+                       help='Filter search to photos containing labeled person(s). Can be used multiple times for multiple people.')
     parser.add_argument('--backfill-faces', action='store_true',
                        help='Detect and store faces for already-indexed photos')
     parser.add_argument('--assign-new-faces', action='store_true',
@@ -974,12 +977,12 @@ Examples:
             # Validate time filter with search
             if args.time and not args.search:
                 print("ℹ️ Using time filter without text query; will filter by time only")
-            person_label = args.person
-            if person_label:
-                # Narrow search to photos containing this labeled person
-                results = search_with_person(searcher, person_label, args.search, args.limit, args.time)
+            person_labels = args.person
+            if person_labels:
+                # Narrow search to photos containing these labeled people
+                results = search_with_multiple_people(searcher, person_labels, args.search, args.limit, args.time)
                 if results is None:
-                    print(f"❌ Person '{person_label}' not found")
+                    print(f"❌ One or more people not found: {person_labels}")
             else:
                 searcher.search_photos(args.search or "", limit=args.limit, time_filter=args.time)
         
@@ -1131,6 +1134,143 @@ def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query
         print(f"   🎯 Similarity: {r['similarity']:.3f}")
     if HAS_MATPLOTLIB and top_results:
         searcher._display_results(top_results, f"Person: {person_label} | {query or ''}")
+    return top_results
+
+def search_with_multiple_people(searcher: UltimatePhotoSearcher, person_labels: List[str], query: Optional[str], limit: int, time_filter: Optional[str]):
+    """Search for photos containing multiple specific people (intersection of all people)."""
+    db = searcher.db
+    
+    # Get clusters for all requested people
+    clusters = []
+    missing_people = []
+    
+    for person_label in person_labels:
+        cluster = db.get_cluster_by_label(person_label)
+        if not cluster:
+            missing_people.append(person_label)
+        else:
+            clusters.append(cluster)
+    
+    if missing_people:
+        print(f"❌ People not found: {', '.join(missing_people)}")
+        return None
+    
+    if not clusters:
+        print("❌ No valid people found")
+        return None
+    
+    cluster_ids = [c['cluster_id'] for c in clusters]
+    print(f"🔍 Searching for photos containing ALL of: {', '.join(person_labels)}")
+    print(f"📊 Using clusters: {cluster_ids}")
+    
+    # Find photos that contain ALL of the specified people
+    # Get photos for each cluster
+    all_photo_sets = []
+    for cluster_id in cluster_ids:
+        photo_ids = db.get_photos_with_clusters([cluster_id])
+        all_photo_sets.append(set(photo_ids))
+        print(f"   Cluster {cluster_id}: {len(photo_ids)} photos")
+    
+    # Find intersection - photos that contain ALL people
+    if not all_photo_sets:
+        print("⚠️ No photos found for any person")
+        return []
+    
+    common_photo_ids = set.intersection(*all_photo_sets)
+    print(f"🎯 Found {len(common_photo_ids)} photos containing ALL {len(person_labels)} people")
+    
+    if not common_photo_ids:
+        print("⚠️ No photos found containing all specified people together")
+        return []
+    
+    # Apply time filter if specified
+    if time_filter:
+        start_ts, end_ts = searcher.temporal_parser.parse_time_expression(time_filter)
+        time_filtered = db.search_photos_by_time(start_ts, end_ts, use_exif=True) or db.search_photos_by_time(start_ts, end_ts, use_exif=False)
+        allowed_ids = {pid for pid, _, _, _ in time_filtered}
+        common_photo_ids = common_photo_ids.intersection(allowed_ids)
+        print(f"🕒 After time filter: {len(common_photo_ids)} photos")
+        
+        if not common_photo_ids:
+            print(f"⚠️ No photos with all people within time range")
+            return []
+    
+    # Convert to list for consistent ordering
+    photo_ids = list(common_photo_ids)
+    
+    # If no query, just display the files
+    if not query:
+        all_embs = db.get_all_embeddings()
+        lookup = {pid: path for pid, path, _ in all_embs}
+        results = []
+        
+        for i, pid in enumerate(photo_ids[:limit], 1):
+            path = lookup.get(pid, '')
+            if not path:
+                continue
+            
+            print(f"\n{i}. 📸 {os.path.basename(path)}")
+            
+            # Show face count for each person
+            for person_label, cluster_id in zip(person_labels, cluster_ids):
+                faces = db.get_faces_by_photo(pid)
+                cluster_faces = [f for f in faces if f.get('cluster_id') == cluster_id]
+                print(f"   👤 {person_label}: {len(cluster_faces)} faces")
+            
+            results.append({'path': path, 'similarity': 1.0})  # No similarity when no query
+        
+        return results
+    
+    # With query: perform semantic search within the filtered photos
+    print(f"🔍 Performing semantic search for '{query}' within {len(photo_ids)} photos")
+    
+    # Get embeddings for the filtered photos
+    all_embs = db.get_all_embeddings()
+    filtered_embs = [(pid, path, emb) for pid, path, emb in all_embs if pid in common_photo_ids]
+    
+    if not filtered_embs:
+        print("⚠️ No embeddings found for filtered photos")
+        return []
+    
+    # Extract query embedding
+    query_embedding = searcher.clip_extractor.get_clip_text_embedding(query)
+    print(f"📝 Extracted text embedding: '{query}' -> ({len(query_embedding)},)")
+    
+    # Calculate similarities
+    similarities = []
+    for pid, path, photo_emb in filtered_embs:
+        sim = np.dot(query_embedding, photo_emb) / (np.linalg.norm(query_embedding) * np.linalg.norm(photo_emb))
+        
+        # Get photo metadata
+        info = db.get_photo_by_id(pid)
+        similarities.append({
+            'path': path,
+            'similarity': sim,
+            'exif_date': info.get('exif_date') if info else None,
+            'created_date': info.get('created_date') if info else None,
+            'photo_id': pid
+        })
+    
+    # Sort by similarity
+    similarities.sort(key=lambda x: x['similarity'], reverse=True)
+    top_results = similarities[:limit]
+    
+    print(f"✅ Found {len(top_results)} matching photos with all people:")
+    
+    # Display results
+    for i, r in enumerate(top_results, 1):
+        print(f"\n{i}. 📸 {os.path.basename(r['path'])}")
+        print(f"   🎯 Similarity: {r['similarity']:.3f}")
+        if r['exif_date']:
+            print(f"   📅 Photo date: {r['exif_date']}")
+        
+        # Show face details for each person
+        pid = r['photo_id']
+        for person_label, cluster_id in zip(person_labels, cluster_ids):
+            faces = db.get_faces_by_photo(pid)
+            cluster_faces = [f for f in faces if f.get('cluster_id') == cluster_id]
+            print(f"   👤 {person_label}: {len(cluster_faces)} faces")
+    
     return top_results
 
 def backfill_faces(searcher: UltimatePhotoSearcher, batch_size: int = 50):

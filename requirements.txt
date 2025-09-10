@@ -20,7 +20,7 @@ mtcnn>=0.1.1                      # Alternative face detection
 facenet-pytorch>=2.5.3            # PyTorch face recognition
 
 # Data Processing
-numpy>=1.24.0                     # Numerical operations
+numpy>=1.24.0,<2.0.0              # Numerical operations (NumPy 1.x for compatibility)
 dateparser>=1.1.8                 # Temporal intelligence
 
 # Utilities
@@ -32,3 +32,5 @@ networkx>=3.1                     # Relationship graph for Stage 2
 # Version compatibility fixes
 ml-dtypes==0.2.0                  # Fix for ONNX compatibility
 onnx>=1.14.0,<1.15.0             # ONNX model format
+tensorflow>=2.13.0,<2.16.0       # TensorFlow compatibility with NumPy 1.x
+protobuf>=3.20.0,<5.0.0          # Protobuf compatibility
