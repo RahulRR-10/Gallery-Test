@@ -162,6 +162,7 @@ python auto_photo_search.py
 ### ✅ Phase 2 Complete (Multi-Person Search & Visual Display)
 
 **Latest Enhancements:**
+
 - **Multi-Person Search**: Find photos containing specific combinations of people
 - **Visual Results**: Interactive photo viewer with color-coded face highlighting
 - **Enhanced CLI**: Support for multiple `--person` arguments and `--no-visual` flag
@@ -170,6 +171,7 @@ python auto_photo_search.py
 - **Professional Models**: Upgraded to LAION ViT-H/14 and YOLOv8x for maximum accuracy
 
 **Example Multi-Person Searches:**
+
 ```bash
 # Find photos with both Alice and Bob
 python final_photo_search.py --person "Alice" --person "Bob"
