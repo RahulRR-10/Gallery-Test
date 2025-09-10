@@ -14,14 +14,18 @@ import os
 class CLIPEmbeddingExtractor:
     """CLIP model wrapper for extracting image and text embeddings"""
     
-    def __init__(self, model_name: str = "openai/clip-vit-base-patch32"):
+    def __init__(self, model_name: str = "laion/CLIP-ViT-H-14-laion2B-s32B-b79K"):
         """
         Initialize CLIP model and processor
         
         Args:
             model_name: HuggingFace model identifier for CLIP
+                      Default: LAION ViT-H/14 (632M params) - Much better than base (151M)
+                      Alternative: "openai/clip-vit-large-patch14" (428M params)
+                      Basic: "openai/clip-vit-base-patch32" (151M params)
         """
         print(f"🔄 Loading CLIP model: {model_name}")
+        print(f"🧠 Model size: {'LAION ViT-H/14 (632M params - High Accuracy)' if 'laion' in model_name.lower() else 'Standard'}")
         
         # Set device
         if torch.cuda.is_available():

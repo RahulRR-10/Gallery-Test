@@ -83,11 +83,13 @@ python auto_photo_search.py
 
 ## 📊 Current Database Stats
 
-- **📸 Total Photos**: 69 indexed
-- **🎯 Object Detection**: 34 photos with detected objects
-- **👤 Face Detection**: 14 photos with detected faces
-- **🧠 Embedding Dimension**: 512
-- **💾 Database Size**: ~0.3MB
+- **📸 Total Photos**: 64 indexed
+- **🧠 CLIP Model**: LAION ViT-H/14 (986M params) - High Accuracy
+- **🎯 Object Detection**: YOLOv8x (68M params) - Professional Grade
+- **👤 Face Detection**: InsightFace Buffalo_L - State-of-the-Art
+- **🕒 Temporal Intelligence**: EXIF + Filename parsing
+- **🧠 Embedding Dimension**: 1024 (upgraded from 512)
+- **💾 Database Size**: ~2MB with full AI analysis
 
 ## 🎯 Search Examples
 
@@ -101,14 +103,17 @@ python auto_photo_search.py
 
 ## 🛠️ System Requirements
 
-- Python 3.8+
-- PyTorch
-- transformers (Hugging Face)
-- ultralytics (YOLO)
-- opencv-python
-- sqlite3 (built-in)
-- numpy
-- matplotlib (optional, for visual results)
+- **Python 3.8+**
+- **PyTorch** (CPU or GPU supported)
+- **transformers** (Hugging Face)
+- **ultralytics** (YOLOv8x)
+- **opencv-python**
+- **insightface** (Advanced face detection)
+- **onnxruntime** (Model inference)
+- **dateparser** (Temporal intelligence)
+- **RAM**: 4GB+ recommended (8GB+ for optimal performance)
+- **Storage**: 2GB+ for models and cache
+- **Network**: Initial download of ~1GB models
 
 ## 🌟 What Makes This Special
 
@@ -128,3 +133,71 @@ python auto_photo_search.py
 3. **Natural Language**: Use descriptive queries like "happy person"
 4. **Be Specific**: "red sports car" works better than just "car"
 5. **Check Objects**: Use `--stats` to see detected object categories
+
+## 🚀 Phase 2 Roadmap
+
+### Stage 1: Temporal Intelligence
+
+**Temporal Intelligence** adds time-based filtering to your photo searches using EXIF metadata timestamps. This allows you to search photos not just by content, but by when they were taken.
+
+**Features:**
+- Parse EXIF timestamps from photo metadata
+- Map human time expressions to date ranges using dateparser
+- Filter search results by time periods
+- Support natural language time queries
+
+**Examples:**
+```bash
+# Search photos from a specific year
+python final_photo_search.py --search "flowers" --time "2023"
+
+# Find photos from last Christmas
+python final_photo_search.py --search "celebration" --time "last Christmas"
+
+# Pictures from college years
+python final_photo_search.py --search "friends" --time "2018-2022"
+
+# Recent vacation photos
+python final_photo_search.py --search "travel" --time "last month"
+```
+
+**Implementation:**
+- EXIF timestamp extraction using Pillow
+- Natural language parsing with dateparser library
+- Extended database schema for temporal metadata
+- CLI integration with `--time` parameter
+
+### Stage 2: Face Recognition + Relationship Mapping
+
+**Face Recognition + Relationship Mapping** builds upon the advanced face detection to identify and cluster people across your photo collection.
+
+**Features:**
+- Face embedding clustering using InsightFace models
+- User labeling system for person identification
+- Co-occurrence analysis for relationship mapping
+- Social graph construction from photo metadata
+- Advanced person search capabilities
+
+**Examples:**
+```bash
+# Search photos with a specific person (after labeling)
+python final_photo_search.py --search "photos with Sarah"
+
+# Find family photos
+python final_photo_search.py --search "family photos"
+
+# Pictures with coworkers
+python final_photo_search.py --search "pictures with my coworkers"
+
+# Photos of multiple people together
+python final_photo_search.py --search "group photos"
+```
+
+**Implementation:**
+- InsightFace face embeddings for person identification
+- DBSCAN clustering for face grouping
+- User labeling interface for person names
+- Co-occurrence matrix for relationship detection
+- Extended database schema for face clusters and relationships
+
+**Status:** 🚧 Coming in Stage 2

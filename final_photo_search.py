@@ -29,6 +29,7 @@ warnings.filterwarnings('ignore')
 # Import our components
 from clip_model import CLIPEmbeddingExtractor
 from photo_database import PhotoDatabase
+from temporal_search import TemporalParser
 
 # For visualization
 try:
@@ -48,7 +49,14 @@ except ImportError:
     HAS_YOLO = False
     print("⚠️ YOLO not available - object detection disabled")
 
-# For face detection
+# For face detection - Advanced models
+try:
+    from advanced_face_detection import AdvancedFaceDetector
+    HAS_ADVANCED_FACE = True
+except ImportError:
+    HAS_ADVANCED_FACE = False
+    
+# Fallback face detection
 try:
     import cv2
     HAS_OPENCV = True
@@ -79,31 +87,53 @@ class UltimatePhotoSearcher:
         print("🔄 Loading CLIP model...")
         self.clip_extractor = CLIPEmbeddingExtractor()
         
+        # Initialize temporal parser
+        print("🕒 Initializing temporal intelligence...")
+        self.temporal_parser = TemporalParser()
+        
         # Initialize YOLO if available
         self.yolo_model = None
         if HAS_YOLO:
             try:
                 print("🎯 Loading YOLO model...")
-                self.yolo_model = YOLO('yolov8n.pt')
-                print("✅ YOLO object detection ready!")
+                # Upgrade to YOLOv8x for much better accuracy (68M params vs 3M)
+                self.yolo_model = YOLO('yolov8x.pt')
+                print("✅ YOLO object detection ready! (YOLOv8x - High Accuracy)")
             except Exception as e:
                 print(f"⚠️ YOLO loading failed: {e}")
                 self.yolo_model = None
         
-        # Initialize face detection
-        self.face_cascade = None
+        # Initialize face detection - Use advanced models
+        self.face_detector = None
+        self.face_cascade = None  # Keep for backward compatibility
+        
+        if HAS_ADVANCED_FACE:
+            try:
+                print("🎯 Loading advanced face detection...")
+                self.face_detector = AdvancedFaceDetector()
+                print("✅ Advanced face detection ready!")
+            except Exception as e:
+                print(f"⚠️ Advanced face detection failed: {e}")
+                self._init_fallback_face_detection()
+        else:
+            self._init_fallback_face_detection()
+        
+        print("✅ Ultimate Photo Search System ready!")
+    
+    def _init_fallback_face_detection(self):
+        """Initialize fallback face detection"""
         if HAS_OPENCV:
             try:
                 cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'  # type: ignore
                 if os.path.exists(cascade_path):
                     self.face_cascade = cv2.CascadeClassifier(cascade_path)
-                    print("✅ Face detection ready!")
+                    print("✅ Fallback face detection ready!")
                 else:
                     print("⚠️ Face cascade file not found")
             except Exception as e:
                 print(f"⚠️ Face detection setup failed: {e}")
-        
-        print("✅ Ultimate Photo Search System ready!")
+        else:
+            print("⚠️ No face detection available")
     
     def _add_enhanced_columns(self):
         """Add enhanced columns to the database"""
@@ -221,8 +251,8 @@ class UltimatePhotoSearcher:
                 object_names = [obj['class'] for obj in objects_data]
                 self._update_photo_objects(photo_id, object_names)
         
-        # Detect faces
-        if self.face_cascade:
+        # Detect faces (advanced or fallback)
+        if self.face_detector or self.face_cascade:
             faces_data = self._detect_faces(image_path)
             if faces_data:
                 self._update_photo_faces(photo_id, faces_data)
@@ -280,7 +310,33 @@ class UltimatePhotoSearcher:
             return []
     
     def _detect_faces(self, image_path: str) -> List[Dict]:
-        """Detect faces using OpenCV or face_recognition"""
+        """Detect faces using advanced face detection or fallback methods"""
+        # Try advanced face detection first
+        if self.face_detector:
+            try:
+                faces = self.face_detector.detect_faces(image_path)
+                
+                # Convert to our format
+                face_data = []
+                for face in faces:
+                    face_info = {
+                        'bbox': face['bbox'],
+                        'confidence': face['confidence'],
+                        'method': 'advanced',
+                        'encoding': face.get('embedding'),
+                        'age': face.get('age'),
+                        'gender': face.get('gender')
+                    }
+                    face_data.append(face_info)
+                
+                if face_data:
+                    print(f"👤 Advanced face detection: {len(face_data)} faces")
+                    return face_data
+                    
+            except Exception as e:
+                print(f"⚠️ Advanced face detection failed: {e}")
+        
+        # Fallback to basic face detection
         if not self.face_cascade:
             return []
         
@@ -305,7 +361,8 @@ class UltimatePhotoSearcher:
                 for (x, y, w, h) in faces:
                     face_info = {
                         'bbox': [int(x), int(y), int(w), int(h)],
-                        'method': 'opencv'
+                        'method': 'opencv',
+                        'confidence': 0.8  # OpenCV doesn't provide confidence
                     }
                     
                     # Try to get face encoding if face_recognition is available
@@ -331,28 +388,52 @@ class UltimatePhotoSearcher:
         
         return []
     
-    def search_photos(self, query: str, limit: int = 5, show_results: bool = True) -> List[Dict]:
+    def search_photos(self, query: str, limit: int = 5, show_results: bool = True, 
+                     time_filter: Optional[str] = None) -> List[Dict]:
         """
-        Search photos using natural language queries
+        Search photos using natural language queries with optional time filtering
+        
+        Args:
+            query: Natural language search query
+            limit: Maximum number of results to return
+            show_results: Whether to display visual results
+            time_filter: Optional time expression like "2020", "last year", "last Christmas"
         """
         print(f"\n🔍 Searching for: '{query}'")
+        
+        # Parse time filter if provided
+        time_range_str = "No time filter"
+        if time_filter:
+            start_ts, end_ts = self.temporal_parser.parse_time_expression(time_filter)
+            time_range_str = self.temporal_parser.format_timestamp_range(start_ts, end_ts)
+            print(f"🕒 Time filter: {time_range_str}")
+        else:
+            start_ts, end_ts = None, None
         
         # Get text embedding for query
         query_embedding = self.clip_extractor.get_clip_text_embedding(query)
         
-        # Search database
-        results = self._search_by_similarity(query_embedding, limit)
+        # Search database with temporal filtering
+        results = self._search_by_similarity(query_embedding, limit, start_ts, end_ts)
         
         if not results:
             print("❌ No matching photos found")
+            if time_filter:
+                print(f"   Try expanding your time range or removing the time filter")
             return []
         
-        print(f"✅ Found {len(results)} matching photos:")
+        print(f"✅ Found {len(results)} matching photos ({time_range_str}):")
         
         # Display results
         for i, result in enumerate(results, 1):
             print(f"\n{i}. 📸 {os.path.basename(result['path'])}")
             print(f"   🎯 Similarity: {result['similarity']:.3f}")
+            
+            # Show photo date if available
+            if result.get('exif_date'):
+                print(f"   📅 Photo date: {result['exif_date'][:10]}")  # Show just the date part
+            elif result.get('created_date'):
+                print(f"   📅 File date: {result['created_date'][:10]}")
             
             # Show detected objects
             if result.get('objects'):
@@ -398,17 +479,43 @@ class UltimatePhotoSearcher:
         
         return results
     
-    def _search_by_similarity(self, query_embedding: np.ndarray, limit: int) -> List[Dict]:
-        """Search photos by embedding similarity"""
-        # Get all embeddings from database
-        all_embeddings = self.db.get_all_embeddings()
+    def _search_by_similarity(self, query_embedding: np.ndarray, limit: int, 
+                             start_timestamp: Optional[int] = None, 
+                             end_timestamp: Optional[int] = None) -> List[Dict]:
+        """
+        Search photos by embedding similarity with optional temporal filtering
         
-        if not all_embeddings:
+        Args:
+            query_embedding: CLIP embedding of the search query
+            limit: Maximum number of results to return
+            start_timestamp: Start of time range filter (Unix timestamp)
+            end_timestamp: End of time range filter (Unix timestamp)
+        """
+        # Get photos in time range if temporal filter is applied
+        if start_timestamp is not None or end_timestamp is not None:
+            # Get photos filtered by time
+            time_filtered_photos = self.db.search_photos_by_time(start_timestamp, end_timestamp, use_exif=True)
+            if not time_filtered_photos:
+                # Try with file timestamps if no EXIF results
+                time_filtered_photos = self.db.search_photos_by_time(start_timestamp, end_timestamp, use_exif=False)
+            
+            if not time_filtered_photos:
+                return []
+            
+            # Get embeddings only for time-filtered photos
+            photo_ids_in_range = {photo_id for photo_id, _, _, _ in time_filtered_photos}
+            all_embeddings = self.db.get_all_embeddings()
+            filtered_embeddings = [(pid, path, emb) for pid, path, emb in all_embeddings if pid in photo_ids_in_range]
+        else:
+            # Get all embeddings from database
+            filtered_embeddings = self.db.get_all_embeddings()
+        
+        if not filtered_embeddings:
             return []
         
         # Calculate similarities
         similarities = []
-        for photo_id, path, photo_embedding in all_embeddings:
+        for photo_id, path, photo_embedding in filtered_embeddings:
             # Cosine similarity
             similarity = np.dot(query_embedding, photo_embedding) / (
                 np.linalg.norm(query_embedding) * np.linalg.norm(photo_embedding)
@@ -437,7 +544,9 @@ class UltimatePhotoSearcher:
                 'path': path,
                 'similarity': float(similarity),
                 'objects': objects,
-                'faces': faces
+                'faces': faces,
+                'exif_date': photo_info.get('exif_date') if photo_info else None,
+                'created_date': photo_info.get('created_date') if photo_info else None
             })
         
         # Sort by similarity
@@ -632,6 +741,8 @@ Examples:
                        help='Index photos from the specified directory')
     parser.add_argument('--search', type=str, metavar='QUERY',
                        help='Search photos using natural language query')
+    parser.add_argument('--time', type=str, metavar='TIME_EXPR',
+                       help='Time filter for search (e.g., "2020", "last year", "last Christmas")')
     parser.add_argument('--stats', action='store_true',
                        help='Show database statistics')
     parser.add_argument('--limit', type=int, default=5, metavar='N',
@@ -662,7 +773,11 @@ Examples:
             searcher.index_photos(args.index)
         
         elif args.search:
-            searcher.search_photos(args.search, limit=args.limit)
+            # Validate time filter with search
+            if args.time and not args.search:
+                print("❌ --time can only be used with --search")
+                return
+            searcher.search_photos(args.search, limit=args.limit, time_filter=args.time)
         
         elif args.stats:
             searcher.show_stats()

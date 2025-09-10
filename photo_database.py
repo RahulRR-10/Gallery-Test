@@ -8,8 +8,11 @@ import numpy as np
 import pickle
 import os
 import time
+import re
 from typing import List, Tuple, Optional
 from datetime import datetime
+from PIL import Image
+from PIL.ExifTags import TAGS
 
 class PhotoDatabase:
     """SQLite database for storing photo embeddings and metadata"""
@@ -39,14 +42,24 @@ class PhotoDatabase:
                     id TEXT PRIMARY KEY,
                     path TEXT NOT NULL,
                     timestamp INTEGER NOT NULL,
+                    exif_timestamp INTEGER,
                     clip_embedding BLOB NOT NULL,
                     file_size INTEGER,
                     image_width INTEGER,
                     image_height INTEGER,
                     created_date TEXT,
+                    exif_date TEXT,
                     indexed_date TEXT
                 )
             ''')
+            
+            # Add exif_timestamp column if it doesn't exist (for existing databases)
+            try:
+                cursor.execute('ALTER TABLE photos ADD COLUMN exif_timestamp INTEGER')
+                cursor.execute('ALTER TABLE photos ADD COLUMN exif_date TEXT')
+            except sqlite3.OperationalError:
+                # Columns already exist
+                pass
             
             # Create index on path for faster lookups
             cursor.execute('''
@@ -56,6 +69,11 @@ class PhotoDatabase:
             # Create index on timestamp for chronological queries
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_timestamp ON photos(timestamp)
+            ''')
+            
+            # Create index on EXIF timestamp for temporal queries
+            cursor.execute('''
+                CREATE INDEX IF NOT EXISTS idx_exif_timestamp ON photos(exif_timestamp)
             ''')
             
             conn.commit()
@@ -74,6 +92,119 @@ class PhotoDatabase:
     def deserialize_embedding(self, embedding_bytes: bytes) -> np.ndarray:
         """Convert bytes back to NumPy array"""
         return pickle.loads(embedding_bytes)
+    
+    def extract_exif_timestamp(self, image_path: str) -> Tuple[Optional[int], Optional[str]]:
+        """
+        Extract EXIF timestamp from image file
+        
+        Args:
+            image_path: Path to the image file
+            
+        Returns:
+            Tuple of (unix_timestamp, iso_date_string) or (None, None) if not found
+        """
+        try:
+            with Image.open(image_path) as img:
+                exif_data = img.getexif()
+                
+                if exif_data:
+                    # Try different EXIF date fields in order of preference
+                    date_fields = [
+                        'DateTime',           # Date and time of image creation
+                        'DateTimeOriginal',   # Date and time when original image was taken
+                        'DateTimeDigitized'   # Date and time when image was digitized
+                    ]
+                    
+                    for field in date_fields:
+                        for tag_id, value in exif_data.items():
+                            tag = TAGS.get(tag_id, tag_id)
+                            if tag == field and value:
+                                try:
+                                    # Parse EXIF date format: "YYYY:MM:DD HH:MM:SS"
+                                    dt = datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
+                                    unix_timestamp = int(dt.timestamp())
+                                    iso_date = dt.isoformat()
+                                    return unix_timestamp, iso_date
+                                except ValueError:
+                                    continue
+                    
+                    # If no standard date fields, try to extract from GPSInfo or other fields
+                    # This is for future enhancement
+                    
+            # If EXIF extraction fails, try to extract date from filename
+            filename = os.path.basename(image_path)
+            
+            # Pattern for Windows Camera app: WIN_YYYYMMDD_HH_MM_SS_Pro.jpg
+            import re
+            win_pattern = r'WIN_(\d{8})_(\d{2})_(\d{2})_(\d{2})_'
+            match = re.search(win_pattern, filename)
+            if match:
+                date_str = match.group(1)  # YYYYMMDD
+                hour = match.group(2)
+                minute = match.group(3)
+                second = match.group(4)
+                
+                try:
+                    # Parse the date components
+                    year = int(date_str[:4])
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:8])
+                    
+                    dt = datetime(year, month, day, int(hour), int(minute), int(second))
+                    unix_timestamp = int(dt.timestamp())
+                    iso_date = dt.isoformat()
+                    print(f"📅 Extracted date from filename: {filename} -> {iso_date}")
+                    return unix_timestamp, iso_date
+                except ValueError as e:
+                    print(f"⚠️ Error parsing filename date {filename}: {e}")
+            
+            # Pattern for IMG_YYYYMMDD_HHMMSS.jpg or similar
+            img_pattern = r'(\d{8})_(\d{6})'
+            match = re.search(img_pattern, filename)
+            if match:
+                date_str = match.group(1)  # YYYYMMDD
+                time_str = match.group(2)  # HHMMSS
+                
+                try:
+                    year = int(date_str[:4])
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:8])
+                    hour = int(time_str[:2])
+                    minute = int(time_str[2:4])
+                    second = int(time_str[4:6])
+                    
+                    dt = datetime(year, month, day, hour, minute, second)
+                    unix_timestamp = int(dt.timestamp())
+                    iso_date = dt.isoformat()
+                    print(f"📅 Extracted date from filename: {filename} -> {iso_date}")
+                    return unix_timestamp, iso_date
+                except ValueError as e:
+                    print(f"⚠️ Error parsing filename date {filename}: {e}")
+            
+            # Pattern for WhatsApp: IMG-YYYYMMDD-WA*.jpg
+            wa_pattern = r'IMG-(\d{8})-WA'
+            match = re.search(wa_pattern, filename)
+            if match:
+                date_str = match.group(1)  # YYYYMMDD
+                
+                try:
+                    year = int(date_str[:4])
+                    month = int(date_str[4:6])
+                    day = int(date_str[6:8])
+                    
+                    # WhatsApp doesn't include time, default to noon
+                    dt = datetime(year, month, day, 12, 0, 0)
+                    unix_timestamp = int(dt.timestamp())
+                    iso_date = dt.isoformat()
+                    print(f"📅 Extracted date from WhatsApp filename: {filename} -> {iso_date}")
+                    return unix_timestamp, iso_date
+                except ValueError as e:
+                    print(f"⚠️ Error parsing WhatsApp filename date {filename}: {e}")
+                                    
+        except Exception as e:
+            print(f"⚠️ Could not extract EXIF from {image_path}: {e}")
+            
+        return None, None
     
     def insert_photo(self, photo_id: str, path: str, timestamp: int, embedding: np.ndarray, 
                     file_size: Optional[int] = None, image_width: Optional[int] = None, 
@@ -100,21 +231,28 @@ class PhotoDatabase:
             # Serialize the embedding
             embedding_blob = self.serialize_embedding(embedding)
             
+            # Extract EXIF timestamp
+            exif_timestamp, exif_date = self.extract_exif_timestamp(path)
+            
             # Get current datetime
             indexed_date = datetime.now().isoformat()
             created_date = datetime.fromtimestamp(timestamp).isoformat()
             
-            # Insert the record
+            # Insert the record with EXIF data
             cursor.execute('''
                 INSERT OR REPLACE INTO photos 
-                (id, path, timestamp, clip_embedding, file_size, image_width, image_height, created_date, indexed_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (photo_id, path, timestamp, embedding_blob, file_size, image_width, image_height, created_date, indexed_date))
+                (id, path, timestamp, exif_timestamp, clip_embedding, file_size, image_width, image_height, created_date, exif_date, indexed_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (photo_id, path, timestamp, exif_timestamp, embedding_blob, file_size, image_width, image_height, created_date, exif_date, indexed_date))
             
             conn.commit()
             conn.close()
             
-            print(f"📸 Inserted photo: {photo_id} -> {path}")
+            # Log EXIF extraction result
+            if exif_timestamp:
+                print(f"📸 Inserted photo: {photo_id} -> {path} (EXIF: {exif_date})")
+            else:
+                print(f"📸 Inserted photo: {photo_id} -> {path} (No EXIF date)")
             return True
             
         except Exception as e:
@@ -165,7 +303,8 @@ class PhotoDatabase:
             cursor = conn.cursor()
             
             cursor.execute('''
-                SELECT id, path, timestamp, file_size, image_width, image_height, created_date, indexed_date
+                SELECT id, path, timestamp, exif_timestamp, file_size, image_width, image_height, 
+                       created_date, exif_date, indexed_date
                 FROM photos WHERE id = ?
             ''', (photo_id,))
             
@@ -177,17 +316,86 @@ class PhotoDatabase:
                     'id': row[0],
                     'path': row[1],
                     'timestamp': row[2],
-                    'file_size': row[3],
-                    'image_width': row[4],
-                    'image_height': row[5],
-                    'created_date': row[6],
-                    'indexed_date': row[7]
+                    'exif_timestamp': row[3],
+                    'file_size': row[4],
+                    'image_width': row[5],
+                    'image_height': row[6],
+                    'created_date': row[7],
+                    'exif_date': row[8],
+                    'indexed_date': row[9]
                 }
             return None
             
         except Exception as e:
             print(f"❌ Error retrieving photo {photo_id}: {e}")
             return None
+    
+    def search_photos_by_time(self, start_timestamp: Optional[int] = None, 
+                             end_timestamp: Optional[int] = None,
+                             use_exif: bool = True) -> List[Tuple[str, str, int, Optional[int]]]:
+        """
+        Search photos by time range
+        
+        Args:
+            start_timestamp: Start of time range (Unix timestamp)
+            end_timestamp: End of time range (Unix timestamp)  
+            use_exif: Whether to use EXIF timestamps (True) or file timestamps (False)
+            
+        Returns:
+            List of tuples: (photo_id, path, timestamp, exif_timestamp)
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Choose which timestamp field to use
+            timestamp_field = 'exif_timestamp' if use_exif else 'timestamp'
+            
+            # Build query based on time range
+            if start_timestamp and end_timestamp:
+                query = f'''
+                    SELECT id, path, timestamp, exif_timestamp 
+                    FROM photos 
+                    WHERE {timestamp_field} BETWEEN ? AND ?
+                    ORDER BY {timestamp_field} DESC
+                '''
+                cursor.execute(query, (start_timestamp, end_timestamp))
+            elif start_timestamp:
+                query = f'''
+                    SELECT id, path, timestamp, exif_timestamp 
+                    FROM photos 
+                    WHERE {timestamp_field} >= ?
+                    ORDER BY {timestamp_field} DESC
+                '''
+                cursor.execute(query, (start_timestamp,))
+            elif end_timestamp:
+                query = f'''
+                    SELECT id, path, timestamp, exif_timestamp 
+                    FROM photos 
+                    WHERE {timestamp_field} <= ?
+                    ORDER BY {timestamp_field} DESC
+                '''
+                cursor.execute(query, (end_timestamp,))
+            else:
+                # No time filter, return all photos ordered by time
+                query = f'''
+                    SELECT id, path, timestamp, exif_timestamp 
+                    FROM photos 
+                    WHERE {timestamp_field} IS NOT NULL
+                    ORDER BY {timestamp_field} DESC
+                '''
+                cursor.execute(query)
+            
+            rows = cursor.fetchall()
+            conn.close()
+            
+            results = [(row[0], row[1], row[2], row[3]) for row in rows]
+            print(f"🕒 Found {len(results)} photos in time range")
+            return results
+            
+        except Exception as e:
+            print(f"❌ Error searching photos by time: {e}")
+            return []
     
     def delete_photo(self, photo_id: str) -> bool:
         """
