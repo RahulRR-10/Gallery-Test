@@ -691,19 +691,33 @@ class UltimatePhotoSearcher:
                 # Add person-targeted face boxes if provided (Stage 2 person search)
                 if result.get('target_faces'):
                     try:
+                        # Define colors for different people
+                        person_colors = ['lime', 'cyan', 'magenta', 'yellow', 'orange', 'red']
+                        person_labels_seen = {}
+                        color_index = 0
+                        
                         for face in result['target_faces']:
                             raw = face.get('bbox')
+                            person_label = face.get('person_label', 'Unknown')
+                            
                             if raw:
                                 bb = self._transform_bbox(raw, img_w, img_h)
                                 if bb is None:
                                     continue
+                                    
+                                # Assign color to person if not already assigned
+                                if person_label not in person_labels_seen:
+                                    person_labels_seen[person_label] = person_colors[color_index % len(person_colors)]
+                                    color_index += 1
+                                
+                                color = person_labels_seen[person_label]
                                 x, y, w, h = self._apply_orientation_to_bbox(bb, img_w, img_h, orientation)
                                 rect = Rectangle((x, y), w, h, 
-                                               linewidth=3, edgecolor='lime', facecolor='none')
+                                               linewidth=3, edgecolor=color, facecolor='none')
                                 axes[i].add_patch(rect)
-                                axes[i].text(x, y - 5, "Match", 
-                                           fontsize=9, color='lime', weight='bold',
-                                           bbox=dict(boxstyle="round,pad=0.3", facecolor='black', alpha=0.4))
+                                axes[i].text(x, y - 5, person_label, 
+                                           fontsize=9, color=color, weight='bold',
+                                           bbox=dict(boxstyle="round,pad=0.3", facecolor='black', alpha=0.7))
                     except Exception:
                         pass
 
@@ -1211,13 +1225,30 @@ def search_with_multiple_people(searcher: UltimatePhotoSearcher, person_labels: 
             
             print(f"\n{i}. 📸 {os.path.basename(path)}")
             
-            # Show face count for each person
+            # Show face count for each person and collect target faces
+            all_target_faces = []
             for person_label, cluster_id in zip(person_labels, cluster_ids):
                 faces = db.get_faces_by_photo(pid)
                 cluster_faces = [f for f in faces if f.get('cluster_id') == cluster_id]
                 print(f"   👤 {person_label}: {len(cluster_faces)} faces")
+                
+                # Add cluster faces to target faces for visual display
+                for face in cluster_faces:
+                    face_copy = face.copy()
+                    face_copy['person_label'] = person_label
+                    all_target_faces.append(face_copy)
             
-            results.append({'path': path, 'similarity': 1.0})  # No similarity when no query
+            result_dict = {
+                'path': path, 
+                'similarity': 1.0,  # No similarity when no query
+                'target_faces': all_target_faces,
+                'photo_id': pid
+            }
+            results.append(result_dict)
+        
+        # Show visual results if matplotlib is available
+        if HAS_MATPLOTLIB and results:
+            searcher._display_results(results, f"People: {', '.join(person_labels)} | No text query")
         
         return results
     
@@ -1266,10 +1297,25 @@ def search_with_multiple_people(searcher: UltimatePhotoSearcher, person_labels: 
         
         # Show face details for each person
         pid = r['photo_id']
+        all_target_faces = []  # Collect all target faces for visual display
+        
         for person_label, cluster_id in zip(person_labels, cluster_ids):
             faces = db.get_faces_by_photo(pid)
             cluster_faces = [f for f in faces if f.get('cluster_id') == cluster_id]
             print(f"   👤 {person_label}: {len(cluster_faces)} faces")
+            
+            # Add cluster faces to target faces for visual display
+            for face in cluster_faces:
+                face_copy = face.copy()
+                face_copy['person_label'] = person_label
+                all_target_faces.append(face_copy)
+        
+        # Add target faces to result for visual display
+        r['target_faces'] = all_target_faces
+    
+    # Show visual results if matplotlib is available
+    if HAS_MATPLOTLIB and top_results:
+        searcher._display_results(top_results, f"People: {', '.join(person_labels)} | {query or 'No text query'}")
     
     return top_results
 
