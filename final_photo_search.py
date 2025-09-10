@@ -920,6 +920,8 @@ Examples:
                        help='Minimum cosine similarity to assign a face to an existing cluster (default: 0.45)')
     parser.add_argument('--assign-photo', type=str, metavar='PATH',
                        help='Only assign faces from a specific photo path')
+    parser.add_argument('--no-visual', action='store_true',
+                       help='Disable visual display of results (CLI only)')
     
     args = parser.parse_args()
     
@@ -994,7 +996,7 @@ Examples:
             person_labels = args.person
             if person_labels:
                 # Narrow search to photos containing these labeled people
-                results = search_with_multiple_people(searcher, person_labels, args.search, args.limit, args.time)
+                results = search_with_multiple_people(searcher, person_labels, args.search, args.limit, args.time, show_visual=not args.no_visual)
                 if results is None:
                     print(f"❌ One or more people not found: {person_labels}")
             else:
@@ -1150,7 +1152,7 @@ def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query
         searcher._display_results(top_results, f"Person: {person_label} | {query or ''}")
     return top_results
 
-def search_with_multiple_people(searcher: UltimatePhotoSearcher, person_labels: List[str], query: Optional[str], limit: int, time_filter: Optional[str]):
+def search_with_multiple_people(searcher: UltimatePhotoSearcher, person_labels: List[str], query: Optional[str], limit: int, time_filter: Optional[str], show_visual: bool = True):
     """Search for photos containing multiple specific people (intersection of all people)."""
     db = searcher.db
     
@@ -1246,8 +1248,8 @@ def search_with_multiple_people(searcher: UltimatePhotoSearcher, person_labels: 
             }
             results.append(result_dict)
         
-        # Show visual results if matplotlib is available
-        if HAS_MATPLOTLIB and results:
+        # Show visual results if matplotlib is available and not disabled
+        if HAS_MATPLOTLIB and results and show_visual:
             searcher._display_results(results, f"People: {', '.join(person_labels)} | No text query")
         
         return results
@@ -1313,8 +1315,8 @@ def search_with_multiple_people(searcher: UltimatePhotoSearcher, person_labels: 
         # Add target faces to result for visual display
         r['target_faces'] = all_target_faces
     
-    # Show visual results if matplotlib is available
-    if HAS_MATPLOTLIB and top_results:
+    # Show visual results if matplotlib is available and not disabled
+    if HAS_MATPLOTLIB and top_results and show_visual:
         searcher._display_results(top_results, f"People: {', '.join(person_labels)} | {query or 'No text query'}")
     
     return top_results
