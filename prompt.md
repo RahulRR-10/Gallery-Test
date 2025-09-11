@@ -28,25 +28,19 @@ Your system already has:
 - ✅ Database Integration (`relationship_inferences` table with confidence scoring)
 - ✅ CLI Commands (`--infer-relationships`, `--list-relationship-types`)
 
-**Current Status**: 19 relationships classified with intelligent typing. System successfully identified family-like bonds ("zero ↔ one" at 90% confidence) and social network structure.
+**Phase 3: User Experience & Integration - ✅ PARTIALLY COMPLETE**
+
+- ✅ **Stage 5: Enhanced User Labeling & Groups** 
+  - ✅ Group Management (`groups` table, JSON storage for cluster IDs)
+  - ✅ CLI Commands (`--create-group`, `--list-groups`, `--add-to-group`, `--remove-from-group`, `--delete-group`)
+  - ✅ Group-based Search (`--group "family"` integration with CLIP search)
+  - ✅ Validated with "family" and "friends" groups
+
+**Current Status**: 19 relationships classified with intelligent typing. Groups created and tested. System successfully identified family-like bonds ("zero ↔ one" at 90% confidence) and implemented group management.
 
 ## 📋 **Remaining Implementation**
 
-### **Phase 3: User Experience & Integration (2-3 days)**
-
-Stage 5 — Enhanced User Labeling & Groups
-
-# Extend existing person labeling system:
-
-# - Enhance existing `--label-person` functionality in `final_photo_search.py`
-
-# - Add group management commands:
-
-# - `--create-group "family" cluster_1 cluster_2 cluster_3`
-
-# - `--list-groups` (show all defined groups)
-
-# - `--add-to-group "coworkers" cluster_5`
+### **Phase 3: User Experience & Integration (1-2 days remaining)**
 
 # - Extend existing database schema:
 
@@ -54,56 +48,29 @@ Stage 5 — Enhanced User Labeling & Groups
 
 # - Implement `propagate_label_by_similarity(cluster_id, threshold=0.85)`:
 
-# - Use existing cluster centroids and cosine similarity
+Stage 6 — Advanced Search Integration (NEXT TO IMPLEMENT)
 
-# - Offer to apply same label to similar clusters (with user confirmation)
+**Relationship-based Search Integration:**
+- `--relationship "family"` - Search by inferred relationship types
+- Enhanced scoring combining CLIP similarity + relationship presence
+- Color-coded relationship visualization in results
+- Integration with existing multi-person search system
 
-# - Add undo functionality for labeling actions
-
-Integration: Build on existing `--list-clusters` and `--label-person` commands.
-
-Stage 6 — Advanced Search Integration
-
-# Integrate relationship data with existing search system:
-
-# - Extend existing multi-person search in `final_photo_search.py`:
-
-# - Add `--group "family"` flag alongside existing `--person` flags
-
-# - Add `--relationship "coworkers"` flag for inferred relationship searches
-
-# - Modify existing search scoring:
-
-# - Combine existing CLIP similarity + object detection + time filtering
-
-# - Add relationship presence scoring for group queries
-
-# - Use existing ranking system: score = w*text * text*sim + w_people * people_score + w_time \* time_score
-
-# - Extend existing visual display system:
-
-# - Color-code relationship types in existing matplotlib visualization
-
-# - Show group labels in existing face highlighting system
-
-Example commands:
-
+**Example commands to implement:**
 ```bash
-# Extend existing multi-person search
-python final_photo_search.py --group "family" --search "beach vacation"
-python final_photo_search.py --relationship "coworkers" --time "last month"
-python final_photo_search.py --person "Alice" --group "friends" --search "party"
+python final_photo_search.py --relationship "family" --search "vacation"
+python final_photo_search.py --relationship "close_friend" --time "last month"
 ```
-
-Integration: Seamlessly extend existing search commands rather than creating new interface.
 
 ### **Phase 4: Visualization & Polish (1-2 days)**
 
-Stage 7 — Debugging & Visualization Tools
+Stage 7 — Debugging & Visualization Tools (TO IMPLEMENT)
 
-# Extend existing visualization infrastructure:
-
-# - Add relationship visualization to existing `--stats` command
+**Visualization Features:**
+- Relationship network visualization (`--visualize-person cluster_id`)
+- Person sample display with face highlighting
+- Relationship statistics export (`--export-relationships output.csv`)
+- Enhanced `--stats` command with relationship insights
 
 # - Implement `visualize_person_samples(cluster_id, k=6)`:
 
@@ -165,7 +132,7 @@ Stage 9 — Advanced ML (Optional)
 - **Day 3-4**: Search integration with existing multi-person system
 - **Day 5**: Visualization tools and export functionality
 
-### **Total Remaining Time: 3-5 days for complete user experience**
+### **Total Remaining Time: 1-2 days for complete user experience**
 
 ## 📋 **Updated CLI Integration**
 
@@ -184,10 +151,16 @@ python final_photo_search.py --enhanced-relationships
 python final_photo_search.py --infer-relationships
 python final_photo_search.py --list-relationship-types
 
-# 🚧 TO IMPLEMENT: Group management and advanced search
+# ✅ COMPLETED group management
 python final_photo_search.py --create-group "family" cluster_1 cluster_2 cluster_3
+python final_photo_search.py --list-groups
+python final_photo_search.py --add-to-group "friends" cluster_5
+python final_photo_search.py --remove-from-group "friends" cluster_4
+python final_photo_search.py --delete-group "group_name"
 python final_photo_search.py --group "family" --search "vacation"
-python final_photo_search.py --relationship "coworkers" --time "last month"
+
+# 🚧 TO IMPLEMENT: Advanced search and visualization
+python final_photo_search.py --relationship "family" --time "last month"
 python final_photo_search.py --visualize-person cluster_1
 python final_photo_search.py --export-relationships output.csv
 ```
@@ -225,8 +198,11 @@ python final_photo_search.py --export-relationships output.csv
 
 ### 🚧 **Remaining Goals**
 
-- [ ] Group management commands functional
-- [ ] Search integration with existing multi-person system
+### 🚧 **Remaining Goals**
+
+- [x] Group management commands functional ✅ **COMPLETED**
+- [x] Group-based search integration ✅ **COMPLETED**
+- [ ] Relationship-based search (`--relationship "family"`)
 - [ ] Visualization tools working with existing matplotlib
 - [ ] Export functionality complete
 
@@ -235,7 +211,7 @@ python final_photo_search.py --export-relationships output.csv
 - **Relationship Accuracy**: >80% user agreement with inferred relationships ✅ **ACHIEVED**
 - **Performance**: Graph construction <30 seconds for 1000 photos ✅ **ACHIEVED**
 - **Memory Usage**: <1GB additional RAM during relationship processing ✅ **ACHIEVED**
-- **User Experience**: All new commands integrate seamlessly with existing CLI ✅ **PARTIAL** (core commands done)
+- **User Experience**: All new commands integrate seamlessly with existing CLI ✅ **MOSTLY ACHIEVED**
 
 ## 📚 **Dependencies**
 

@@ -9,6 +9,7 @@ import pickle
 import os
 import time
 import re
+import json
 from typing import List, Tuple, Optional
 from datetime import datetime
 from PIL import Image
@@ -108,6 +109,16 @@ class PhotoDatabase:
                     count INTEGER DEFAULT 0,
                     weight REAL DEFAULT 0,
                     PRIMARY KEY (cluster_id_a, cluster_id_b)
+                )
+            ''')
+
+            # Phase 3: Groups table for organizing clusters into named groups
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS groups (
+                    group_name TEXT PRIMARY KEY,
+                    cluster_ids TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT
                 )
             ''')
 
@@ -819,6 +830,254 @@ class PhotoDatabase:
         except Exception as e:
             print(f"❌ Error getting photos with clusters: {e}")
             return []
+
+    # Phase 3: Group Management Methods
+    def create_group(self, group_name: str, cluster_ids: List[str]) -> bool:
+        """
+        Create a new group with specified cluster IDs
+        
+        Args:
+            group_name: Name of the group (e.g., "family", "coworkers")
+            cluster_ids: List of cluster IDs to include in the group
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Verify all cluster IDs exist
+            for cluster_id in cluster_ids:
+                cursor.execute('SELECT cluster_id FROM face_clusters WHERE cluster_id = ?', (cluster_id,))
+                if not cursor.fetchone():
+                    print(f"❌ Cluster ID '{cluster_id}' does not exist")
+                    conn.close()
+                    return False
+            
+            # Create group (will replace if exists)
+            cluster_ids_json = json.dumps(cluster_ids)
+            created_at = datetime.now().isoformat()
+            
+            cursor.execute('''
+                INSERT OR REPLACE INTO groups (group_name, cluster_ids, created_at, updated_at)
+                VALUES (?, ?, ?, ?)
+            ''', (group_name, cluster_ids_json, created_at, created_at))
+            
+            conn.commit()
+            conn.close()
+            
+            print(f"✅ Group '{group_name}' created with {len(cluster_ids)} clusters")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error creating group: {e}")
+            return False
+
+    def add_to_group(self, group_name: str, cluster_id: str) -> bool:
+        """
+        Add a cluster to an existing group
+        
+        Args:
+            group_name: Name of the existing group
+            cluster_id: Cluster ID to add
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Verify cluster exists
+            cursor.execute('SELECT cluster_id FROM face_clusters WHERE cluster_id = ?', (cluster_id,))
+            if not cursor.fetchone():
+                print(f"❌ Cluster ID '{cluster_id}' does not exist")
+                conn.close()
+                return False
+            
+            # Get existing group
+            cursor.execute('SELECT cluster_ids FROM groups WHERE group_name = ?', (group_name,))
+            row = cursor.fetchone()
+            if not row:
+                print(f"❌ Group '{group_name}' does not exist")
+                conn.close()
+                return False
+            
+            # Add cluster if not already in group
+            existing_cluster_ids = json.loads(row[0])
+            if cluster_id not in existing_cluster_ids:
+                existing_cluster_ids.append(cluster_id)
+                updated_cluster_ids = json.dumps(existing_cluster_ids)
+                updated_at = datetime.now().isoformat()
+                
+                cursor.execute('''
+                    UPDATE groups SET cluster_ids = ?, updated_at = ?
+                    WHERE group_name = ?
+                ''', (updated_cluster_ids, updated_at, group_name))
+                
+                conn.commit()
+                print(f"✅ Added cluster '{cluster_id}' to group '{group_name}'")
+            else:
+                print(f"ℹ️ Cluster '{cluster_id}' already in group '{group_name}'")
+            
+            conn.close()
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error adding to group: {e}")
+            return False
+
+    def remove_from_group(self, group_name: str, cluster_id: str) -> bool:
+        """
+        Remove a cluster from a group
+        
+        Args:
+            group_name: Name of the group
+            cluster_id: Cluster ID to remove
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Get existing group
+            cursor.execute('SELECT cluster_ids FROM groups WHERE group_name = ?', (group_name,))
+            row = cursor.fetchone()
+            if not row:
+                print(f"❌ Group '{group_name}' does not exist")
+                conn.close()
+                return False
+            
+            # Remove cluster if in group
+            existing_cluster_ids = json.loads(row[0])
+            if cluster_id in existing_cluster_ids:
+                existing_cluster_ids.remove(cluster_id)
+                updated_cluster_ids = json.dumps(existing_cluster_ids)
+                updated_at = datetime.now().isoformat()
+                
+                cursor.execute('''
+                    UPDATE groups SET cluster_ids = ?, updated_at = ?
+                    WHERE group_name = ?
+                ''', (updated_cluster_ids, updated_at, group_name))
+                
+                conn.commit()
+                print(f"✅ Removed cluster '{cluster_id}' from group '{group_name}'")
+            else:
+                print(f"ℹ️ Cluster '{cluster_id}' not in group '{group_name}'")
+            
+            conn.close()
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error removing from group: {e}")
+            return False
+
+    def list_groups(self) -> List[dict]:
+        """
+        List all groups and their members
+        
+        Returns:
+            List of group dictionaries with name, cluster_ids, and metadata
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT group_name, cluster_ids, created_at, updated_at
+                FROM groups
+                ORDER BY group_name
+            ''')
+            
+            groups = []
+            for row in cursor.fetchall():
+                group_name, cluster_ids_json, created_at, updated_at = row
+                cluster_ids = json.loads(cluster_ids_json)
+                
+                # Get labels for clusters
+                cluster_labels = {}
+                for cluster_id in cluster_ids:
+                    cursor.execute('SELECT label FROM face_clusters WHERE cluster_id = ?', (cluster_id,))
+                    label_row = cursor.fetchone()
+                    cluster_labels[cluster_id] = label_row[0] if label_row and label_row[0] else "Unlabeled"
+                
+                groups.append({
+                    'group_name': group_name,
+                    'cluster_ids': cluster_ids,
+                    'cluster_labels': cluster_labels,
+                    'created_at': created_at,
+                    'updated_at': updated_at
+                })
+            
+            conn.close()
+            return groups
+            
+        except Exception as e:
+            print(f"❌ Error listing groups: {e}")
+            return []
+
+    def get_group_cluster_ids(self, group_name: str) -> List[str]:
+        """
+        Get cluster IDs for a specific group
+        
+        Args:
+            group_name: Name of the group
+            
+        Returns:
+            List of cluster IDs in the group
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT cluster_ids FROM groups WHERE group_name = ?', (group_name,))
+            row = cursor.fetchone()
+            
+            conn.close()
+            
+            if row:
+                return json.loads(row[0])
+            else:
+                print(f"❌ Group '{group_name}' not found")
+                return []
+                
+        except Exception as e:
+            print(f"❌ Error getting group cluster IDs: {e}")
+            return []
+
+    def delete_group(self, group_name: str) -> bool:
+        """
+        Delete a group
+        
+        Args:
+            group_name: Name of the group to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('DELETE FROM groups WHERE group_name = ?', (group_name,))
+            rows_affected = cursor.rowcount
+            
+            conn.commit()
+            conn.close()
+            
+            if rows_affected > 0:
+                print(f"✅ Group '{group_name}' deleted")
+                return True
+            else:
+                print(f"❌ Group '{group_name}' not found")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error deleting group: {e}")
+            return False
 
 
 def test_database():

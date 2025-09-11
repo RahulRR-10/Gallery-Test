@@ -940,6 +940,20 @@ Examples:
     parser.add_argument('--list-relationship-types', action='store_true',
                        help='Show all inferred relationship types')
     
+    # Phase 3: Group Management
+    parser.add_argument('--create-group', nargs='+', metavar=('GROUP_NAME', 'CLUSTER_ID'),
+                       help='Create a group with name and cluster IDs: --create-group "family" cluster_1 cluster_2')
+    parser.add_argument('--list-groups', action='store_true',
+                       help='List all groups and their members')
+    parser.add_argument('--add-to-group', nargs=2, metavar=('GROUP_NAME', 'CLUSTER_ID'),
+                       help='Add a cluster to an existing group')
+    parser.add_argument('--remove-from-group', nargs=2, metavar=('GROUP_NAME', 'CLUSTER_ID'),
+                       help='Remove a cluster from a group')
+    parser.add_argument('--delete-group', type=str, metavar='GROUP_NAME',
+                       help='Delete a group')
+    parser.add_argument('--group', type=str, metavar='GROUP_NAME',
+                       help='Filter search to photos containing people from a specific group')
+    
     args = parser.parse_args()
     
     # Check if no meaningful arguments provided (include Stage 2 flags)
@@ -961,7 +975,13 @@ Examples:
         args.build_events,
         args.enhanced_relationships,
         args.infer_relationships,
-        args.list_relationship_types
+        args.list_relationship_types,
+        args.create_group,
+        args.list_groups,
+        args.add_to_group,
+        args.remove_from_group,
+        args.delete_group,
+        args.group
     ]):
         parser.print_help()
         return
@@ -1141,16 +1161,106 @@ Examples:
                 print("⚠️ Relationship inferences table not found. Run --infer-relationships first.")
             
             conn.close()
-        elif args.search or args.person:
+        
+        # Phase 3: Group Management Commands
+        elif args.create_group:
+            if len(args.create_group) < 2:
+                print("❌ Usage: --create-group \"group_name\" cluster_1 cluster_2 ...")
+                return
+            
+            group_name = args.create_group[0]
+            cluster_ids = args.create_group[1:]
+            
+            print(f"🏷️ Creating group '{group_name}' with clusters: {cluster_ids}")
+            db = PhotoDatabase(args.db)
+            success = db.create_group(group_name, cluster_ids)
+            
+            if success:
+                print(f"✅ Group '{group_name}' created successfully!")
+            
+        elif args.list_groups:
+            print("📋 Listing all groups...")
+            db = PhotoDatabase(args.db)
+            groups = db.list_groups()
+            
+            if groups:
+                print(f"\n🏷️ Found {len(groups)} groups:")
+                print("-" * 60)
+                for group in groups:
+                    print(f"\n📁 Group: {group['group_name']}")
+                    print(f"   Members: {len(group['cluster_ids'])} clusters")
+                    for cluster_id in group['cluster_ids']:
+                        label = group['cluster_labels'].get(cluster_id, 'Unlabeled')
+                        print(f"     • {cluster_id}: {label}")
+                    print(f"   Created: {group['created_at']}")
+            else:
+                print("⚠️ No groups found. Use --create-group to create one.")
+        
+        elif args.add_to_group:
+            group_name, cluster_id = args.add_to_group
+            print(f"➕ Adding cluster '{cluster_id}' to group '{group_name}'...")
+            
+            db = PhotoDatabase(args.db)
+            success = db.add_to_group(group_name, cluster_id)
+            
+        elif args.remove_from_group:
+            group_name, cluster_id = args.remove_from_group
+            print(f"➖ Removing cluster '{cluster_id}' from group '{group_name}'...")
+            
+            db = PhotoDatabase(args.db)
+            success = db.remove_from_group(group_name, cluster_id)
+            
+        elif args.delete_group:
+            group_name = args.delete_group
+            print(f"🗑️ Deleting group '{group_name}'...")
+            
+            db = PhotoDatabase(args.db)
+            success = db.delete_group(group_name)
+        
+        elif args.search or args.person or args.group:
             # Validate time filter with search
             if args.time and not args.search:
                 print("ℹ️ Using time filter without text query; will filter by time only")
-            person_labels = args.person
-            if person_labels:
+            
+            # Handle group-based search
+            if args.group:
+                print(f"🏷️ Searching for photos with group '{args.group}'...")
+                db = PhotoDatabase(args.db)
+                group_cluster_ids = db.get_group_cluster_ids(args.group)
+                
+                if not group_cluster_ids:
+                    print(f"❌ Group '{args.group}' not found or empty")
+                    return
+                
+                # Get labels for clusters in the group
+                group_labels = []
+                for cluster_id in group_cluster_ids:
+                    cluster = db.get_clusters()
+                    for c in cluster:
+                        if c['cluster_id'] == cluster_id and c['label']:
+                            group_labels.append(c['label'])
+                            break
+                    else:
+                        # If no label found, use cluster_id
+                        group_labels.append(cluster_id)
+                
+                if group_labels:
+                    print(f"🔍 Searching for photos containing people from group '{args.group}': {group_labels}")
+                    results = search_with_multiple_people(searcher, group_labels, args.search, args.limit, args.time, show_visual=not args.no_visual)
+                    if results is None:
+                        print(f"❌ No photos found with group '{args.group}'")
+                else:
+                    print(f"⚠️ No labeled people found in group '{args.group}'")
+            
+            # Handle person-based search
+            elif args.person:
+                person_labels = args.person
                 # Narrow search to photos containing these labeled people
                 results = search_with_multiple_people(searcher, person_labels, args.search, args.limit, args.time, show_visual=not args.no_visual)
                 if results is None:
                     print(f"❌ One or more people not found: {person_labels}")
+            
+            # Handle regular search
             else:
                 searcher.search_photos(args.search or "", limit=args.limit, time_filter=args.time)
         

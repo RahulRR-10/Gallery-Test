@@ -26,6 +26,11 @@ photos/
 *.sqlite
 *.sqlite3
 
+# Relationship graph files (generated)
+relationship_graph.json
+enhanced_relationship_graph.json
+relationship_graph.graphml
+
 # Python cache and bytecode
 __pycache__/
 *.py[cod]
