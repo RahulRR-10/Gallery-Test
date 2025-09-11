@@ -1,4 +1,4 @@
-# AI Model Files (Large binaries)
+﻿# AI Model Files (Large binaries)
 yolov8x.pt
 *.pt
 *.onnx
@@ -18,31 +18,17 @@ photos/
 *.tiff
 *.webp
 *.mp4
-*.avi
-*.mov
 
 # Database files
+photos.db
 *.db
 *.sqlite
-*.sqlite3
 
-# Relationship graph files (generated)
-relationship_graph.json
-enhanced_relationship_graph.json
-relationship_graph.graphml
-
-# Export files (CSV, JSON, etc.)
-*_export.csv
-*_export.json
-relationships_*.csv
-visualization_*.png
-visualization_*.jpg
-
-# Python cache and bytecode
+# Python cache and temporary files
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
 build/
 develop-eggs/
@@ -56,46 +42,23 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
 # Virtual environments
-.env
-.venv
-env/
 venv/
+env/
 ENV/
 env.bak/
 venv.bak/
-.venv311/
+
 # IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Model cache directories
-.cache/
-.transformers/
-.insightface/
-huggingface_hub/
-
-# Logs and temporary files
-*.log
-*.tmp
-*.temp
-.pytest_cache/
-.coverage
-htmlcov/
 
 # OS generated files
 .DS_Store
