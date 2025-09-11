@@ -864,6 +864,84 @@ class UltimatePhotoSearcher:
             
             conn.close()
         
+        # Stage 7: Add relationship intelligence statistics
+        try:
+            import sqlite3
+            conn = sqlite3.connect(self.db.db_path)
+            cursor = conn.cursor()
+            
+            # Check if relationship tables exist
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='relationship_inferences'")
+            if cursor.fetchone():
+                print(f"\n🔗 Relationship Intelligence Statistics")
+                print("-" * 40)
+                
+                # Total relationships
+                cursor.execute("SELECT COUNT(*) FROM relationship_inferences")
+                total_relationships = cursor.fetchone()[0]
+                print(f"📊 Total relationships: {total_relationships}")
+                
+                if total_relationships > 0:
+                    # Relationship type breakdown
+                    cursor.execute('''
+                        SELECT inferred_type, COUNT(*) as count, AVG(confidence) as avg_confidence
+                        FROM relationship_inferences 
+                        GROUP BY inferred_type 
+                        ORDER BY count DESC
+                    ''')
+                    
+                    rel_stats = cursor.fetchall()
+                    print(f"🏷️ Relationship types:")
+                    for rel_type, count, avg_conf in rel_stats:
+                        print(f"   {rel_type.replace('_', ' ').title()}: {count} ({avg_conf:.1%} avg confidence)")
+                    
+                    # Highest confidence relationships
+                    cursor.execute('''
+                        SELECT ri.inferred_type, ri.confidence, fc1.label, fc2.label
+                        FROM relationship_inferences ri
+                        LEFT JOIN face_clusters fc1 ON ri.cluster_id_a = fc1.cluster_id
+                        LEFT JOIN face_clusters fc2 ON ri.cluster_id_b = fc2.cluster_id
+                        ORDER BY ri.confidence DESC
+                        LIMIT 3
+                    ''')
+                    
+                    top_relationships = cursor.fetchall()
+                    if top_relationships:
+                        print(f"🌟 Strongest relationships:")
+                        for rel_type, confidence, label_a, label_b in top_relationships:
+                            name_a = label_a or "Unlabeled"
+                            name_b = label_b or "Unlabeled"
+                            print(f"   {name_a} ↔ {name_b} ({rel_type.replace('_', ' ')}, {confidence:.1%})")
+                
+                # Groups statistics
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='groups'")
+                if cursor.fetchone():
+                    cursor.execute("SELECT COUNT(*) FROM groups")
+                    total_groups = cursor.fetchone()[0]
+                    print(f"\n👥 Groups: {total_groups}")
+                    
+                    if total_groups > 0:
+                        cursor.execute('''
+                            SELECT group_name, cluster_ids
+                            FROM groups
+                            ORDER BY group_name
+                        ''')
+                        
+                        groups = cursor.fetchall()
+                        print(f"📁 Group breakdown:")
+                        for group_name, cluster_ids_json in groups:
+                            try:
+                                import json
+                                cluster_ids = json.loads(cluster_ids_json)
+                                print(f"   {group_name}: {len(cluster_ids)} members")
+                            except:
+                                print(f"   {group_name}: Unknown members")
+            
+            conn.close()
+        except Exception as e:
+            # Silently skip relationship stats if tables don't exist
+            pass
+        
         print("=" * 50)
 
 def main():
@@ -957,6 +1035,12 @@ Examples:
     parser.add_argument('--relationship', type=str, metavar='RELATIONSHIP_TYPE',
                        help='Filter search to photos containing people with a specific relationship type (family, close_friend, acquaintance)')
     
+    # Stage 7: Visualization & Export Tools
+    parser.add_argument('--visualize-person', type=str, metavar='CLUSTER_ID',
+                       help='Visualize person samples with face highlighting for a specific cluster')
+    parser.add_argument('--export-relationships', type=str, metavar='PATH',
+                       help='Export relationship data to CSV file')
+    
     args = parser.parse_args()
     
     # Check if no meaningful arguments provided (include Stage 2 flags)
@@ -985,7 +1069,9 @@ Examples:
         args.remove_from_group,
         args.delete_group,
         args.group,
-        args.relationship
+        args.relationship,
+        args.visualize_person,
+        args.export_relationships
     ]):
         parser.print_help()
         return
@@ -1331,6 +1417,15 @@ Examples:
         
         elif args.stats:
             searcher.show_stats()
+        
+        # Stage 7: Visualization & Export Tools
+        elif args.visualize_person:
+            print(f"🎨 Visualizing person samples for cluster '{args.visualize_person}'...")
+            visualize_person_samples(searcher, args.visualize_person)
+            
+        elif args.export_relationships:
+            print(f"📊 Exporting relationship data to '{args.export_relationships}'...")
+            export_relationship_summary_csv(args.db, args.export_relationships)
             
     except KeyboardInterrupt:
         print("\n⚠️ Operation cancelled by user")
@@ -1961,6 +2056,190 @@ def assign_new_faces(searcher: UltimatePhotoSearcher, threshold: float = 0.45, o
         else:
             print(f"   ❌ Below threshold {threshold}")
     print(f"✅ Assigned {assigned}/{len(unclustered)} new faces to existing clusters (threshold={threshold})")
+
+
+def visualize_person_samples(searcher: UltimatePhotoSearcher, cluster_id: str, k: int = 6):
+    """Visualize sample photos with face highlighting for a specific person cluster."""
+    if not HAS_MATPLOTLIB:
+        print("❌ Matplotlib not available for visualization")
+        return
+    
+    db = searcher.db
+    
+    # Get cluster info
+    clusters = db.get_clusters()
+    cluster_info = None
+    for c in clusters:
+        if c['cluster_id'] == cluster_id:
+            cluster_info = c
+            break
+    
+    if not cluster_info:
+        print(f"❌ Cluster '{cluster_id}' not found")
+        return
+    
+    print(f"🎨 Visualizing person: {cluster_info['label'] or cluster_id}")
+    print(f"📊 Total faces in cluster: {cluster_info['num_faces']}")
+    
+    # Get photos containing this cluster
+    photo_ids = db.get_photos_with_clusters([cluster_id])
+    if not photo_ids:
+        print("❌ No photos found for this cluster")
+        return
+    
+    # Limit to k samples
+    sample_photo_ids = photo_ids[:k]
+    print(f"📸 Showing {len(sample_photo_ids)} sample photos (of {len(photo_ids)} total)")
+    
+    # Get photo paths and face data
+    all_embs = db.get_all_embeddings()
+    photo_lookup = {pid: path for pid, path, _ in all_embs}
+    
+    results = []
+    for pid in sample_photo_ids:
+        path = photo_lookup.get(pid)
+        if not path:
+            continue
+        
+        # Get faces for this photo and cluster
+        faces = db.get_faces_by_photo(pid)
+        cluster_faces = [f for f in faces if f.get('cluster_id') == cluster_id]
+        
+        target_faces = []
+        for face in cluster_faces:
+            bbox = eval(face['bbox'])
+            target_faces.append({
+                'bbox': bbox,
+                'person': cluster_info['label'] or cluster_id,
+                'cluster_id': cluster_id
+            })
+        
+        results.append({
+            'path': path,
+            'similarity': 1.0,  # Not applicable for visualization
+            'target_faces': target_faces
+        })
+    
+    # Display results
+    if results:
+        searcher._display_results(results, f"Person Samples: {cluster_info['label'] or cluster_id}")
+        
+        # Show relationship context
+        print(f"\n🔗 Relationship context for {cluster_info['label'] or cluster_id}:")
+        
+        import sqlite3 as sql
+        conn = sql.connect(db.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                SELECT ri.cluster_id_a, ri.cluster_id_b, ri.inferred_type, ri.confidence,
+                       fc1.label as label_a, fc2.label as label_b
+                FROM relationship_inferences ri
+                LEFT JOIN face_clusters fc1 ON ri.cluster_id_a = fc1.cluster_id
+                LEFT JOIN face_clusters fc2 ON ri.cluster_id_b = fc2.cluster_id
+                WHERE ri.cluster_id_a = ? OR ri.cluster_id_b = ?
+                ORDER BY ri.confidence DESC
+            ''', (cluster_id, cluster_id))
+            
+            relationships = cursor.fetchall()
+            
+            if relationships:
+                for cluster_a, cluster_b, rel_type, confidence, label_a, label_b in relationships:
+                    if cluster_a == cluster_id:
+                        other_label = label_b or cluster_b
+                    else:
+                        other_label = label_a or cluster_a
+                    
+                    print(f"  • {rel_type.replace('_', ' ').title()} with {other_label} ({confidence:.1%} confidence)")
+            else:
+                print("  • No relationships found")
+                
+        except sql.OperationalError:
+            print("  • Relationship data not available (run --infer-relationships)")
+        
+        conn.close()
+    else:
+        print("❌ No valid photos found for visualization")
+
+
+def export_relationship_summary_csv(db_path: str, output_path: str):
+    """Export relationship data to CSV file."""
+    import csv
+    import sqlite3 as sql
+    
+    print(f"📊 Exporting relationship data to {output_path}...")
+    
+    conn = sql.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        # Get cluster information with labels
+        cursor.execute('''
+            SELECT cluster_id, label, 
+                   (SELECT COUNT(*) FROM faces WHERE cluster_id = fc.cluster_id) as num_faces,
+                   (SELECT COUNT(DISTINCT photo_id) FROM faces WHERE cluster_id = fc.cluster_id) as num_photos
+            FROM face_clusters fc
+            ORDER BY cluster_id
+        ''')
+        
+        clusters = cursor.fetchall()
+        
+        # Get relationship information
+        cursor.execute('''
+            SELECT ri.cluster_id_a, ri.cluster_id_b, ri.inferred_type, ri.confidence,
+                   fc1.label as label_a, fc2.label as label_b
+            FROM relationship_inferences ri
+            LEFT JOIN face_clusters fc1 ON ri.cluster_id_a = fc1.cluster_id
+            LEFT JOIN face_clusters fc2 ON ri.cluster_id_b = fc2.cluster_id
+            ORDER BY ri.confidence DESC
+        ''')
+        
+        relationships = cursor.fetchall()
+        
+        # Write to CSV
+        with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.writer(csvfile)
+            
+            # Write header
+            writer.writerow(['Export Type', 'Cluster ID', 'Label', 'Faces', 'Photos', 
+                           'Related Cluster', 'Related Label', 'Relationship Type', 'Confidence'])
+            
+            # Write cluster data
+            for cluster_id, label, num_faces, num_photos in clusters:
+                writer.writerow(['Cluster', cluster_id, label or 'Unlabeled', num_faces, num_photos, 
+                               '', '', '', ''])
+            
+            # Write relationship data
+            for cluster_a, cluster_b, rel_type, confidence, label_a, label_b in relationships:
+                writer.writerow(['Relationship', cluster_a, label_a or 'Unlabeled', '', '', 
+                               cluster_b, label_b or 'Unlabeled', rel_type, f"{confidence:.3f}"])
+        
+        print(f"✅ Exported {len(clusters)} clusters and {len(relationships)} relationships")
+        print(f"📁 File saved: {output_path}")
+        
+        # Print summary
+        print(f"\n📈 Summary:")
+        print(f"  • Total Clusters: {len(clusters)}")
+        print(f"  • Total Relationships: {len(relationships)}")
+        
+        if relationships:
+            rel_types = {}
+            for _, _, rel_type, _, _, _ in relationships:
+                rel_types[rel_type] = rel_types.get(rel_type, 0) + 1
+            
+            print(f"  • Relationship Breakdown:")
+            for rel_type, count in sorted(rel_types.items()):
+                print(f"    - {rel_type.replace('_', ' ').title()}: {count}")
+        
+    except sql.OperationalError as e:
+        print(f"❌ Database error: {e}")
+        print("💡 Make sure you have run --cluster-faces and --infer-relationships")
+    except Exception as e:
+        print(f"❌ Export failed: {e}")
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
     print("🚀 Ultimate On-Device Photo Search System")

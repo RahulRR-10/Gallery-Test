@@ -31,6 +31,13 @@ relationship_graph.json
 enhanced_relationship_graph.json
 relationship_graph.graphml
 
+# Export files (CSV, JSON, etc.)
+*_export.csv
+*_export.json
+relationships_*.csv
+visualization_*.png
+visualization_*.jpg
+
 # Python cache and bytecode
 __pycache__/
 *.py[cod]

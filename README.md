@@ -22,31 +22,45 @@ A complete AI-powered photo### **🔗 Relationship Intelligence (NEW!)**
 
 ## 🚀 Recent Updates
 
-### ✅ Phase 3 Complete (Advanced Search Integration)
+### ✅ Phase 4 Complete (Visualization & Polish)
 
 **Latest Revolutionary Features:**
 
-- **🔍 Relationship-based Search**: Search by inferred relationship types (`--relationship "family"`)
-- **� Enhanced Scoring**: Combines CLIP similarity with relationship confidence boosts (up to 10%)
-- **� Union-based Search**: Find photos containing ANY person from a relationship type
-- **🎯 Context-aware Results**: Shows relationship details and confidence levels in search results
-- **⚡ Intelligent Boosting**: Photos with stronger relationships rank higher in semantic search
+- **🎨 Person Visualization**: `--visualize-person` shows sample photos with face highlighting and relationship context
+- **📊 CSV Export**: `--export-relationships` exports comprehensive cluster and relationship data to CSV files
+- **📈 Enhanced Statistics**: `--stats` now includes relationship intelligence insights and breakdowns
+- **🔍 Debugging Tools**: Complete visualization and export system for relationship analysis
+- **⚡ Full Integration**: All tools work seamlessly with existing database and visualization systems
 
 **Real Results from Our Test Collection:**
 
-- **19 Relationships Classified**: 1 family (90% confidence), 2 close friends (70%), 16 acquaintances
-- **Family Detection**: Successfully identified "zero ↔ one" as family relationship with 90% confidence
-- **Smart Boosting**: Photos with family members together get relationship confidence boosts
-- **Union Search**: Finds 36 photos containing ANY family member, 37 photos with close friends
+- **Comprehensive Visualization**: Person samples show 6 representative photos with face highlighting
+- **Relationship Context**: Each person visualization includes all relationships with confidence levels
+- **Complete Export**: CSV export contains all 10 clusters and 19 relationships with detailed data
+- **Enhanced Stats**: Shows relationship breakdowns (16 acquaintance, 2 close friend, 1 family)
 
-**Example Relationship Search Commands:**
+**Example Visualization & Export Commands:**
 
 ```bash
-# Search for family photos with semantic queries
-python final_photo_search.py --relationship "family" --search "smiling vacation"
+# Visualize person samples with relationship context
+python final_photo_search.py --visualize-person cluster_0
 
-# Find all photos with close friends
-python final_photo_search.py --relationship "close_friend" --limit 10
+# Export all relationship data to CSV
+python final_photo_search.py --export-relationships my_relationships.csv
+
+# Enhanced statistics with relationship insights
+python final_photo_search.py --stats
+```
+
+### ✅ Previous: Advanced Search Integration
+
+**Completed Revolutionary Features:**
+
+- **🔍 Relationship-based Search**: Search by inferred relationship types (`--relationship "family"`)
+- **📈 Enhanced Scoring**: Combines CLIP similarity with relationship confidence boosts (up to 10%)
+- **🔗 Union-based Search**: Find photos containing ANY person from a relationship type
+- **🎯 Context-aware Results**: Shows relationship details and confidence levels in search results
+- **⚡ Intelligent Boosting**: Photos with stronger relationships rank higher in semantic search
 
 # Time-filtered relationship search
 python final_photo_search.py --relationship "family" --time "last month"
@@ -89,8 +103,19 @@ python final_photo_search.py --relationship "family"
 - **🤖 Smart Relationship Detection**: AI-powered inference of family, friends, and acquaintances
 - **📊 Event Clustering**: Groups photos into temporal events for context-aware analysis
 - **🏷️ Group Management**: Organize people into custom groups (family, friends, coworkers)
-- **� Confidence Scoring**: Relationship predictions with accuracy confidence levels
+- **📈 Confidence Scoring**: Relationship predictions with accuracy confidence levels
 - **🎯 Group-based Search**: Find photos by group membership ("family vacation photos")
+- **🔍 Relationship-based Search**: Search by relationship type with enhanced scoring
+- **⚡ Union Search Strategy**: Find photos containing ANY person from the relationship group
+- **📈 Enhanced Scoring**: Combines CLIP similarity with relationship confidence boosts
+
+### **🎨 Visualization & Export Tools (NEW!)**
+
+- **🎨 Person Visualization**: Sample photos with face highlighting and relationship context
+- **📊 CSV Export**: Comprehensive relationship and cluster data export
+- **📈 Enhanced Statistics**: Relationship intelligence insights and breakdowns
+- **🔍 Debugging Tools**: Complete visualization system for relationship analysis
+- **🎯 Context Display**: Shows all relationships for each person with confidence levels
 
 ### **User Experience**
 
@@ -176,10 +201,15 @@ python final_photo_search.py --list-groups
 python final_photo_search.py --add-to-group "friends" cluster_5
 python final_photo_search.py --remove-from-group "friends" cluster_4
 
-# Relationship-based Search (NEW!)
+# Relationship-based Search
 python final_photo_search.py --relationship "family"
 python final_photo_search.py --relationship "close_friend" --search "outdoor party"
 python final_photo_search.py --relationship "acquaintance" --time "last year"
+
+# Visualization & Export Tools (NEW!)
+python final_photo_search.py --visualize-person cluster_0
+python final_photo_search.py --export-relationships my_relationships.csv
+python final_photo_search.py --stats  # Enhanced with relationship insights
 
 # Auto-indexing with monitoring
 python auto_photo_search.py --watch
