@@ -1,6 +1,15 @@
 # 🌟 Ultimate On-Device AI Photo Search System
 
-A complete AI-powered photo search system with relationship intelligence that runs 100% locally on your device. Search your photos using natural langua## 📝 Usage Tips
+A complete AI-powered photo### **🔗 Relationship Intelligence (NEW!)**
+
+- **🤖 Smart Relationship Detection**: AI-powered inference of family, friends, and acquaintances  
+- **📊 Event Clustering**: Groups photos into temporal events for context-aware analysis
+- **🏷️ Group Management**: Organize people into custom groups (family, friends, coworkers)
+- **📈 Confidence Scoring**: Relationship predictions with accuracy confidence levels
+- **🎯 Group-based Search**: Find photos by group membership ("family vacation photos")
+- **🔍 Relationship-based Search**: Search by relationship type with enhanced scoring
+- **⚡ Union Search Strategy**: Find photos containing ANY person from the relationship group
+- **📈 Enhanced Scoring**: Combines CLIP similarity with relationship confidence boosts system with relationship intelligence that runs 100% locally on your device. Search your photos using natural langua## 📝 Usage Tips
 
 1. **Add Photos**: Drop images into `sample_photos/` folder
 2. **Index First**: Run indexing before searching new photos
@@ -13,9 +22,42 @@ A complete AI-powered photo search system with relationship intelligence that ru
 
 ## 🚀 Recent Updates
 
-### ✅ Phase 3 Complete (Relationship Intelligence & Group Management)
+### ✅ Phase 3 Complete (Advanced Search Integration)
 
 **Latest Revolutionary Features:**
+
+- **🔍 Relationship-based Search**: Search by inferred relationship types (`--relationship "family"`)
+- **� Enhanced Scoring**: Combines CLIP similarity with relationship confidence boosts (up to 10%)
+- **� Union-based Search**: Find photos containing ANY person from a relationship type
+- **🎯 Context-aware Results**: Shows relationship details and confidence levels in search results
+- **⚡ Intelligent Boosting**: Photos with stronger relationships rank higher in semantic search
+
+**Real Results from Our Test Collection:**
+
+- **19 Relationships Classified**: 1 family (90% confidence), 2 close friends (70%), 16 acquaintances
+- **Family Detection**: Successfully identified "zero ↔ one" as family relationship with 90% confidence
+- **Smart Boosting**: Photos with family members together get relationship confidence boosts
+- **Union Search**: Finds 36 photos containing ANY family member, 37 photos with close friends
+
+**Example Relationship Search Commands:**
+
+```bash
+# Search for family photos with semantic queries
+python final_photo_search.py --relationship "family" --search "smiling vacation"
+
+# Find all photos with close friends
+python final_photo_search.py --relationship "close_friend" --limit 10
+
+# Time-filtered relationship search
+python final_photo_search.py --relationship "family" --time "last month"
+
+# Browse all family photos (no query)
+python final_photo_search.py --relationship "family"
+```
+
+### ✅ Previous: Relationship Intelligence & Group Management
+
+**Completed Revolutionary Features:**
 
 - **🤖 Relationship Intelligence**: AI automatically detects family, friends, and acquaintances
 - **📊 Event Clustering**: Groups photos by time to understand relationship context
@@ -23,28 +65,6 @@ A complete AI-powered photo search system with relationship intelligence that ru
 - **🔍 Group-based Search**: Find photos using group membership
 - **📈 Confidence Scoring**: Relationship predictions with accuracy percentages
 - **🎯 Smart Detection**: Successfully identified family bonds with 90% confidence
-
-**Real Results from Our Test Collection:**
-
-- **19 Relationships Classified**: 1 family (90% confidence), 2 close friends (70%), 16 acquaintances
-- **Family Detection**: "zero ↔ one" identified as family relationship
-- **Smart Groups**: Created "family" and "friends" groups for organized searching
-
-**Example Relationship Commands:**
-
-```bash
-# Build relationship intelligence
-python final_photo_search.py --infer-relationships
-
-# Create smart groups
-python final_photo_search.py --create-group "family" cluster_0 cluster_1
-
-# Search by group
-python final_photo_search.py --group "family" --search "outdoor vacation"
-
-# List all relationships with confidence scores
-python final_photo_search.py --list-relationship-types
-```
 
 ### ✅ Previous: Multi-Person Search & Visual Display
 
@@ -112,9 +132,14 @@ python final_photo_search.py --person "Alice"
 python final_photo_search.py --person "Alice" --person "Bob"
 python final_photo_search.py --person "Alice" --person "Bob" --search "beach"
 
-# Group-based search (NEW!)
+# Group-based search
 python final_photo_search.py --group "family" --search "vacation"
 python final_photo_search.py --group "friends" --time "last month"
+
+# Relationship-based search (NEW!)
+python final_photo_search.py --relationship "family" --search "smiling vacation"
+python final_photo_search.py --relationship "close_friend" --limit 10
+python final_photo_search.py --relationship "family" --time "last month"
 
 # Time-based filtering
 python final_photo_search.py --search "vacation" --time "2025"
@@ -139,17 +164,22 @@ python final_photo_search.py --cluster-faces
 python final_photo_search.py --list-clusters
 python final_photo_search.py --label-person cluster_1 "Alice"
 
-# Relationship Intelligence (NEW!)
+# Relationship Intelligence
 python final_photo_search.py --build-relationships
 python final_photo_search.py --enhanced-relationships
 python final_photo_search.py --infer-relationships
 python final_photo_search.py --list-relationship-types
 
-# Group Management (NEW!)
+# Group Management
 python final_photo_search.py --create-group "family" cluster_1 cluster_2
 python final_photo_search.py --list-groups
 python final_photo_search.py --add-to-group "friends" cluster_5
 python final_photo_search.py --remove-from-group "friends" cluster_4
+
+# Relationship-based Search (NEW!)
+python final_photo_search.py --relationship "family"
+python final_photo_search.py --relationship "close_friend" --search "outdoor party"
+python final_photo_search.py --relationship "acquaintance" --time "last year"
 
 # Auto-indexing with monitoring
 python auto_photo_search.py --watch
