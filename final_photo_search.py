@@ -33,6 +33,7 @@ from sklearn.cluster import DBSCAN
 from clip_model import CLIPEmbeddingExtractor
 from photo_database import PhotoDatabase
 from temporal_search import TemporalParser
+from relationship_mapping import RelationshipMapper, build_relationships_cli, infer_relationships_cli
 import numpy as np
 
 # For visualization
@@ -923,6 +924,22 @@ Examples:
     parser.add_argument('--no-visual', action='store_true',
                        help='Disable visual display of results (CLI only)')
     
+    # Phase 1: Relationship Mapping
+    parser.add_argument('--build-relationships', action='store_true',
+                       help='Build co-occurrence graph from existing face clusters')
+    parser.add_argument('--relationship-stats', action='store_true',
+                       help='Show relationship graph statistics')
+    parser.add_argument('--build-events', action='store_true',
+                       help='Group photos into events based on time proximity')
+    parser.add_argument('--event-window', type=int, default=48, metavar='HOURS',
+                       help='Time window in hours for event clustering (default: 48)')
+    parser.add_argument('--enhanced-relationships', action='store_true',
+                       help='Build enhanced relationship graph with event context')
+    parser.add_argument('--infer-relationships', action='store_true',
+                       help='Infer relationship types (family, friends, etc.) from co-occurrence patterns')
+    parser.add_argument('--list-relationship-types', action='store_true',
+                       help='Show all inferred relationship types')
+    
     args = parser.parse_args()
     
     # Check if no meaningful arguments provided (include Stage 2 flags)
@@ -938,7 +955,13 @@ Examples:
         args.rebuild_relationships,
         args.person,
         args.backfill_faces,
-        args.assign_new_faces
+        args.assign_new_faces,
+        args.build_relationships,
+        args.relationship_stats,
+        args.build_events,
+        args.enhanced_relationships,
+        args.infer_relationships,
+        args.list_relationship_types
     ]):
         parser.print_help()
         return
@@ -989,6 +1012,135 @@ Examples:
             label_cluster(args.db, cid, label)
         elif args.rebuild_relationships:
             rebuild_relationships(args.db)
+        elif args.build_relationships:
+            # Phase 1: Build relationship graph
+            print("🔗 Building relationship graph from existing face clusters...")
+            graph = build_relationships_cli(args.db, save_graph=True)
+            if graph:
+                print("✅ Relationship graph built successfully!")
+            else:
+                print("❌ Failed to build relationship graph")
+        elif args.relationship_stats:
+            # Show relationship statistics
+            mapper = RelationshipMapper(args.db)
+            graph = mapper.load_graph()
+            if graph:
+                stats = mapper.get_graph_stats(graph)
+                print("\n📊 Relationship Graph Statistics:")
+                print("=" * 40)
+                for key, value in stats.items():
+                    if isinstance(value, dict):
+                        print(f"{key.replace('_', ' ').title()}:")
+                        for sub_key, sub_value in value.items():
+                            print(f"  {sub_key.replace('_', ' ').title()}: {sub_value}")
+                    else:
+                        print(f"{key.replace('_', ' ').title()}: {value}")
+            else:
+                print("⚠️ No relationship graph found. Run --build-relationships first.")
+        elif args.build_events:
+            # Stage 2: Build event clusters
+            print("📅 Building event clusters from photo timestamps...")
+            mapper = RelationshipMapper(args.db)
+            events = mapper.group_photos_into_events(args.event_window)
+            
+            if events:
+                print(f"\n✅ Event clustering complete!")
+                print(f"📊 Created {len(events)} events")
+                
+                # Show sample events
+                print("\n📅 Sample Events:")
+                for i, (event_id, photo_ids) in enumerate(list(events.items())[:5]):
+                    print(f"  {event_id}: {len(photo_ids)} photos")
+                
+                if len(events) > 5:
+                    print(f"  ... and {len(events) - 5} more events")
+            else:
+                print("❌ No events could be created")
+        elif args.enhanced_relationships:
+            # Stage 2: Build enhanced relationship graph with event context
+            print("🔗 Building enhanced relationship graph with event context...")
+            mapper = RelationshipMapper(args.db)
+            graph = mapper.build_enhanced_cooccurrence_graph(args.event_window)
+            
+            if graph and len(graph.nodes) > 0:
+                # Show enhanced statistics
+                stats = mapper.get_graph_stats(graph)
+                print("\n📊 Enhanced Relationship Graph Statistics:")
+                print("=" * 50)
+                for key, value in stats.items():
+                    if isinstance(value, dict):
+                        print(f"{key.replace('_', ' ').title()}:")
+                        for sub_key, sub_value in value.items():
+                            print(f"  {sub_key.replace('_', ' ').title()}: {sub_value}")
+                    else:
+                        print(f"{key.replace('_', ' ').title()}: {value}")
+                
+                # Show event-aware relationship insights
+                print("\n🎯 Event-Aware Relationship Insights:")
+                for edge in graph.edges(data=True):
+                    cluster_a, cluster_b, data = edge
+                    if data.get('shared_events', 0) >= 3:  # Show relationships with 3+ shared events
+                        label_a = graph.nodes[cluster_a].get('label', cluster_a)
+                        label_b = graph.nodes[cluster_b].get('label', cluster_b)
+                        shared = data.get('shared_events', 0)
+                        fraction = data.get('event_cooccurrence_fraction', 0)
+                        print(f"  {label_a} ↔ {label_b}: {shared} shared events ({fraction:.1%} co-occurrence)")
+                
+                # Update database and save
+                mapper.update_relationships_table(graph)
+                mapper.save_graph(graph, "enhanced_relationship_graph.json")
+                print("✅ Enhanced relationship graph saved!")
+            else:
+                print("❌ Failed to build enhanced relationship graph")
+        elif args.infer_relationships:
+            # Stage 3: Infer relationship types
+            print("🧠 Inferring relationship types from co-occurrence patterns...")
+            result = infer_relationships_cli(args.db, args.event_window)
+            
+            if result and result[0]:
+                print("✅ Relationship inference complete!")
+            else:
+                print("❌ Failed to infer relationships. Make sure you have built enhanced relationships first.")
+        elif args.list_relationship_types:
+            # Show relationship type database
+            print("📋 Listing all inferred relationship types...")
+            
+            import sqlite3 as sql
+            conn = sql.connect(args.db)
+            cursor = conn.cursor()
+            
+            try:
+                cursor.execute('''
+                    SELECT ri.cluster_id_a, ri.cluster_id_b, ri.inferred_type, ri.confidence,
+                           fc1.label as label_a, fc2.label as label_b
+                    FROM relationship_inferences ri
+                    LEFT JOIN face_clusters fc1 ON ri.cluster_id_a = fc1.cluster_id
+                    LEFT JOIN face_clusters fc2 ON ri.cluster_id_b = fc2.cluster_id
+                    ORDER BY ri.confidence DESC, ri.inferred_type
+                ''')
+                
+                relationships = cursor.fetchall()
+                
+                if relationships:
+                    print(f"\n📊 Found {len(relationships)} inferred relationships:")
+                    print("-" * 80)
+                    
+                    current_type = None
+                    for cluster_a, cluster_b, rel_type, confidence, label_a, label_b in relationships:
+                        if rel_type != current_type:
+                            current_type = rel_type
+                            print(f"\n{rel_type.replace('_', ' ').title()}:")
+                        
+                        name_a = label_a or cluster_a
+                        name_b = label_b or cluster_b
+                        print(f"  • {name_a} ↔ {name_b} ({confidence:.1%} confidence)")
+                else:
+                    print("⚠️ No relationship inferences found. Run --infer-relationships first.")
+                    
+            except sql.OperationalError:
+                print("⚠️ Relationship inferences table not found. Run --infer-relationships first.")
+            
+            conn.close()
         elif args.search or args.person:
             # Validate time filter with search
             if args.time and not args.search:
