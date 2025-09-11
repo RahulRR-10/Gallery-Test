@@ -30,7 +30,7 @@ Your system already has:
 
 **Phase 3: User Experience & Integration - ✅ PARTIALLY COMPLETE**
 
-- ✅ **Stage 5: Enhanced User Labeling & Groups** 
+- ✅ **Stage 5: Enhanced User Labeling & Groups**
   - ✅ Group Management (`groups` table, JSON storage for cluster IDs)
   - ✅ CLI Commands (`--create-group`, `--list-groups`, `--add-to-group`, `--remove-from-group`, `--delete-group`)
   - ✅ Group-based Search (`--group "family"` integration with CLIP search)
@@ -51,12 +51,14 @@ Your system already has:
 Stage 6 — Advanced Search Integration (NEXT TO IMPLEMENT)
 
 **Relationship-based Search Integration:**
+
 - `--relationship "family"` - Search by inferred relationship types
 - Enhanced scoring combining CLIP similarity + relationship presence
 - Color-coded relationship visualization in results
 - Integration with existing multi-person search system
 
 **Example commands to implement:**
+
 ```bash
 python final_photo_search.py --relationship "family" --search "vacation"
 python final_photo_search.py --relationship "close_friend" --time "last month"
@@ -67,6 +69,7 @@ python final_photo_search.py --relationship "close_friend" --time "last month"
 Stage 7 — Debugging & Visualization Tools (TO IMPLEMENT)
 
 **Visualization Features:**
+
 - Relationship network visualization (`--visualize-person cluster_id`)
 - Person sample display with face highlighting
 - Relationship statistics export (`--export-relationships output.csv`)

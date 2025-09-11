@@ -28,6 +28,7 @@ warnings.filterwarnings('ignore')
 import hashlib
 import json
 from sklearn.cluster import DBSCAN
+from datetime import datetime
 
 # Import our components
 from clip_model import CLIPEmbeddingExtractor
@@ -953,6 +954,8 @@ Examples:
                        help='Delete a group')
     parser.add_argument('--group', type=str, metavar='GROUP_NAME',
                        help='Filter search to photos containing people from a specific group')
+    parser.add_argument('--relationship', type=str, metavar='RELATIONSHIP_TYPE',
+                       help='Filter search to photos containing people with a specific relationship type (family, close_friend, acquaintance)')
     
     args = parser.parse_args()
     
@@ -981,7 +984,8 @@ Examples:
         args.add_to_group,
         args.remove_from_group,
         args.delete_group,
-        args.group
+        args.group,
+        args.relationship
     ]):
         parser.print_help()
         return
@@ -1217,7 +1221,7 @@ Examples:
             db = PhotoDatabase(args.db)
             success = db.delete_group(group_name)
         
-        elif args.search or args.person or args.group:
+        elif args.search or args.person or args.group or args.relationship:
             # Validate time filter with search
             if args.time and not args.search:
                 print("ℹ️ Using time filter without text query; will filter by time only")
@@ -1251,6 +1255,67 @@ Examples:
                         print(f"❌ No photos found with group '{args.group}'")
                 else:
                     print(f"⚠️ No labeled people found in group '{args.group}'")
+            
+            # Handle relationship-based search
+            elif args.relationship:
+                print(f"🔗 Searching for photos with relationship type '{args.relationship}'...")
+                db = PhotoDatabase(args.db)
+                
+                # Get all relationships of the specified type
+                import sqlite3 as sql
+                conn = sql.connect(args.db)
+                cursor = conn.cursor()
+                
+                try:
+                    # Normalize relationship type input
+                    relationship_type = args.relationship.lower().replace('-', '_').replace(' ', '_')
+                    if relationship_type == 'family':
+                        relationship_type = 'family'
+                    elif relationship_type in ['close_friend', 'friend', 'friends']:
+                        relationship_type = 'close_friend'
+                    elif relationship_type in ['acquaintance', 'acquaintances']:
+                        relationship_type = 'acquaintance'
+                    
+                    cursor.execute('''
+                        SELECT ri.cluster_id_a, ri.cluster_id_b, ri.confidence,
+                               fc1.label as label_a, fc2.label as label_b
+                        FROM relationship_inferences ri
+                        LEFT JOIN face_clusters fc1 ON ri.cluster_id_a = fc1.cluster_id
+                        LEFT JOIN face_clusters fc2 ON ri.cluster_id_b = fc2.cluster_id
+                        WHERE ri.inferred_type = ?
+                        ORDER BY ri.confidence DESC
+                    ''', (relationship_type,))
+                    
+                    relationships = cursor.fetchall()
+                    conn.close()
+                    
+                    if relationships:
+                        print(f"📊 Found {len(relationships)} relationships of type '{relationship_type}'")
+                        
+                        # Collect all people in these relationships
+                        relationship_people = set()
+                        for cluster_a, cluster_b, confidence, label_a, label_b in relationships:
+                            if label_a:
+                                relationship_people.add(label_a)
+                            if label_b:
+                                relationship_people.add(label_b)
+                        
+                        if relationship_people:
+                            people_list = list(relationship_people)
+                            print(f"🔍 Searching for photos containing people with '{relationship_type}' relationships: {people_list}")
+                            
+                            # Use a modified search that finds photos with ANY of these people
+                            results = search_with_relationship_people(searcher, people_list, relationships, args.search, args.limit, args.time, show_visual=not args.no_visual)
+                            if results is None:
+                                print(f"❌ No photos found with '{relationship_type}' relationships")
+                        else:
+                            print(f"⚠️ No labeled people found in '{relationship_type}' relationships")
+                    else:
+                        print(f"⚠️ No relationships of type '{relationship_type}' found. Available types: family, close_friend, acquaintance")
+                        
+                except sql.OperationalError:
+                    print("⚠️ Relationship inferences table not found. Run --infer-relationships first.")
+                    conn.close()
             
             # Handle person-based search
             elif args.person:
@@ -1582,6 +1647,235 @@ def search_with_multiple_people(searcher: UltimatePhotoSearcher, person_labels: 
         searcher._display_results(top_results, f"People: {', '.join(person_labels)} | {query or 'No text query'}")
     
     return top_results
+
+
+def search_with_relationship_people(searcher: UltimatePhotoSearcher, person_labels: List[str], relationships: List[Tuple], query: Optional[str], limit: int, time_filter: Optional[str], show_visual: bool = True):
+    """Search for photos containing people with specific relationship types (union - ANY person from the relationships)."""
+    db = searcher.db
+    
+    # Get clusters for all requested people
+    clusters = []
+    missing_people = []
+    
+    for person_label in person_labels:
+        cluster = db.get_cluster_by_label(person_label)
+        if not cluster:
+            missing_people.append(person_label)
+        else:
+            clusters.append(cluster)
+    
+    if missing_people:
+        print(f"❌ People not found: {', '.join(missing_people)}")
+        return None
+    
+    if not clusters:
+        print("❌ No valid people found")
+        return None
+    
+    cluster_ids = [c['cluster_id'] for c in clusters]
+    print(f"🔍 Searching for photos containing ANY of: {', '.join(person_labels)}")
+    print(f"📊 Using clusters: {cluster_ids}")
+    
+    # Find photos that contain ANY of the specified people (union instead of intersection)
+    all_photo_sets = []
+    for cluster_id in cluster_ids:
+        photo_ids = db.get_photos_with_clusters([cluster_id])
+        all_photo_sets.append(set(photo_ids))
+        print(f"   Cluster {cluster_id}: {len(photo_ids)} photos")
+    
+    # Find union - photos that contain ANY of the people
+    if not all_photo_sets:
+        print("⚠️ No photos found for any person")
+        return []
+    
+    union_photo_ids = set.union(*all_photo_sets)
+    print(f"🎯 Found {len(union_photo_ids)} photos containing ANY of the {len(person_labels)} people")
+    
+    if not union_photo_ids:
+        print("⚠️ No photos found containing any of the specified people")
+        return []
+    
+    # Apply time filter if specified
+    if time_filter:
+        start_ts, end_ts = searcher.temporal_parser.parse_time_expression(time_filter)
+        time_filtered = db.search_photos_by_time(start_ts, end_ts, use_exif=True) or db.search_photos_by_time(start_ts, end_ts, use_exif=False)
+        allowed_ids = {pid for pid, _, _, _ in time_filtered}
+        union_photo_ids = union_photo_ids.intersection(allowed_ids)
+        print(f"🕒 After time filter: {len(union_photo_ids)} photos")
+        
+        if not union_photo_ids:
+            print(f"⚠️ No photos with any people within time range")
+            return []
+    
+    # Convert to list for consistent ordering
+    photo_ids = list(union_photo_ids)
+    
+    # If no query, just display the files
+    if not query:
+        all_embs = db.get_all_embeddings()
+        lookup = {pid: path for pid, path, _ in all_embs}
+        results = []
+        
+        for i, pid in enumerate(photo_ids[:limit], 1):
+            path = lookup.get(pid, '')
+            if not path:
+                continue
+            
+            print(f"\n{i}. 📸 {os.path.basename(path)}")
+            
+            # Show which people are present and their relationship info
+            present_people = []
+            all_target_faces = []
+            for person_label, cluster_id in zip(person_labels, cluster_ids):
+                faces = db.get_faces_by_photo(pid)
+                cluster_faces = [f for f in faces if f.get('cluster_id') == cluster_id]
+                if cluster_faces:
+                    present_people.append(person_label)
+                    print(f"   👤 {person_label}: {len(cluster_faces)} faces")
+                    
+                    # Add cluster faces to target faces for visual display
+                    for face in cluster_faces:
+                        bbox = eval(face['bbox'])
+                        all_target_faces.append({
+                            'bbox': bbox,
+                            'person': person_label,
+                            'cluster_id': cluster_id
+                        })
+            
+            # Show relationship context
+            relevant_relationships = []
+            for cluster_a, cluster_b, confidence, label_a, label_b in relationships:
+                if (label_a in present_people and label_b in present_people):
+                    relevant_relationships.append((label_a, label_b, confidence))
+            
+            if relevant_relationships:
+                print(f"   🔗 Relationships in photo:")
+                for person_a, person_b, conf in relevant_relationships:
+                    print(f"      {person_a} ↔ {person_b} ({conf:.1%} confidence)")
+            
+            results.append({
+                'photo_id': pid,
+                'path': path,
+                'similarity': 1.0,  # Default for no-query results
+                'target_faces': all_target_faces
+            })
+            
+            # Visual display
+            if show_visual and HAS_MATPLOTLIB:
+                searcher._display_results([{
+                    'path': path,
+                    'similarity': 1.0,
+                    'target_faces': all_target_faces
+                }], f"Relationship Search: {', '.join(person_labels)}")
+        
+        return results
+    
+    # With query: perform semantic search within the filtered photos
+    print(f"🔍 Performing semantic search for '{query}' within {len(photo_ids)} photos")
+    
+    # Get embeddings for the filtered photos
+    all_embs = db.get_all_embeddings()
+    filtered_embs = [(pid, path, emb) for pid, path, emb in all_embs if pid in union_photo_ids]
+    
+    if not filtered_embs:
+        print("⚠️ No embeddings found for filtered photos")
+        return []
+    
+    # Extract query embedding
+    query_embedding = searcher.clip_extractor.get_clip_text_embedding(query)
+    print(f"📝 Extracted text embedding: '{query}' -> ({len(query_embedding)},)")
+    
+    # Calculate similarities with relationship context boost
+    similarities = []
+    for pid, path, photo_emb in filtered_embs:
+        sim = np.dot(query_embedding, photo_emb) / (np.linalg.norm(query_embedding) * np.linalg.norm(photo_emb))
+        
+        # Boost similarity for photos with stronger relationships
+        relationship_boost = 0.0
+        present_people = []
+        for person_label, cluster_id in zip(person_labels, cluster_ids):
+            faces = db.get_faces_by_photo(pid)
+            cluster_faces = [f for f in faces if f.get('cluster_id') == cluster_id]
+            if cluster_faces:
+                present_people.append(person_label)
+        
+        # Calculate relationship boost based on people present
+        for cluster_a, cluster_b, confidence, label_a, label_b in relationships:
+            if label_a in present_people and label_b in present_people:
+                # Boost based on relationship confidence
+                relationship_boost += confidence * 0.1  # Max 10% boost per relationship
+        
+        # Apply relationship boost
+        boosted_sim = min(sim + relationship_boost, 1.0)
+        similarities.append((pid, path, boosted_sim, sim))
+    
+    # Sort by similarity
+    similarities.sort(key=lambda x: x[2], reverse=True)
+    results = []
+    
+    print(f"✅ Found {len(similarities)} matching photos with relationship context:")
+    
+    for i, (pid, path, boosted_sim, original_sim) in enumerate(similarities[:limit], 1):
+        print(f"\n{i}. 📸 {os.path.basename(path)}")
+        print(f"   🎯 Similarity: {boosted_sim:.3f}")
+        if boosted_sim != original_sim:
+            print(f"   📈 Relationship boost: +{boosted_sim - original_sim:.3f}")
+        
+        # Get photo metadata
+        photo_data = db.get_photo_by_id(pid)
+        if photo_data and photo_data[3]:  # exif_timestamp exists
+            exif_ts = photo_data[3]
+            if exif_ts:
+                exif_date = datetime.fromtimestamp(exif_ts)
+                print(f"   📅 Photo date: {exif_date.strftime('%Y-%m-%dT%H:%M:%S')}")
+        
+        # Show which people are present and their relationships
+        present_people = []
+        all_target_faces = []
+        for person_label, cluster_id in zip(person_labels, cluster_ids):
+            faces = db.get_faces_by_photo(pid)
+            cluster_faces = [f for f in faces if f.get('cluster_id') == cluster_id]
+            if cluster_faces:
+                present_people.append(person_label)
+                print(f"   👤 {person_label}: {len(cluster_faces)} faces")
+                
+                # Add cluster faces to target faces for visual display
+                for face in cluster_faces:
+                    bbox = eval(face['bbox'])
+                    all_target_faces.append({
+                        'bbox': bbox,
+                        'person': person_label,
+                        'cluster_id': cluster_id
+                    })
+        
+        # Show relationship context
+        relevant_relationships = []
+        for cluster_a, cluster_b, confidence, label_a, label_b in relationships:
+            if (label_a in present_people and label_b in present_people):
+                relevant_relationships.append((label_a, label_b, confidence))
+        
+        if relevant_relationships:
+            print(f"   🔗 Active relationships:")
+            for person_a, person_b, conf in relevant_relationships:
+                print(f"      {person_a} ↔ {person_b} ({conf:.1%} confidence)")
+        
+        results.append({
+            'photo_id': pid,
+            'path': path,
+            'similarity': boosted_sim,
+            'target_faces': all_target_faces
+        })
+        
+        # Visual display
+        if show_visual and HAS_MATPLOTLIB:
+            searcher._display_results([{
+                'path': path,
+                'similarity': boosted_sim,
+                'target_faces': all_target_faces
+            }], f"Relationship Search: {', '.join(person_labels)} | {query}")
+    
+    return results
+
 
 def backfill_faces(searcher: UltimatePhotoSearcher, batch_size: int = 50):
     """Run face detection for photos already in DB that lack face records."""

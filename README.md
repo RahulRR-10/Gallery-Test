@@ -25,6 +25,7 @@ A complete AI-powered photo search system with relationship intelligence that ru
 - **🎯 Smart Detection**: Successfully identified family bonds with 90% confidence
 
 **Real Results from Our Test Collection:**
+
 - **19 Relationships Classified**: 1 family (90% confidence), 2 close friends (70%), 16 acquaintances
 - **Family Detection**: "zero ↔ one" identified as family relationship
 - **Smart Groups**: Created "family" and "friends" groups for organized searching
@@ -56,6 +57,7 @@ python final_photo_search.py --list-relationship-types
 ## 🚀 Features
 
 ### **Core Search & Intelligence**
+
 - **🧠 Semantic Search**: CLIP embeddings for natural language understanding
 - **🎯 Object Detection**: YOLO model detects 80+ object categories
 - **👤 Advanced Face Detection**: InsightFace with age/gender analysis
@@ -63,6 +65,7 @@ python final_photo_search.py --list-relationship-types
 - **🕒 Temporal Intelligence**: Search by time periods ("last month", "2025")
 
 ### **🔗 Relationship Intelligence (NEW!)**
+
 - **🤖 Smart Relationship Detection**: AI-powered inference of family, friends, and acquaintances
 - **📊 Event Clustering**: Groups photos into temporal events for context-aware analysis
 - **🏷️ Group Management**: Organize people into custom groups (family, friends, coworkers)
@@ -70,6 +73,7 @@ python final_photo_search.py --list-relationship-types
 - **🎯 Group-based Search**: Find photos by group membership ("family vacation photos")
 
 ### **User Experience**
+
 - **🎨 Visual Results**: Interactive photo viewer with face highlighting
 - **🔒 Privacy-First**: All processing happens locally (no cloud required)
 - **⚡ Real-Time**: Instant search results with similarity scoring
@@ -209,6 +213,7 @@ The system uses advanced graph analysis to understand relationships:
 ## 🎯 Search Examples
 
 ### Traditional Search
+
 | Query                         | Best Results                           |
 | ----------------------------- | -------------------------------------- |
 | `"motorcycle racing sport"`   | motorbike_0223.jpg, motorbike_0221.jpg |
@@ -216,11 +221,12 @@ The system uses advanced graph analysis to understand relationships:
 | `"beautiful flower garden"`   | flower_0716.jpg, flower_0715.jpg       |
 
 ### Relationship-Powered Search (NEW!)
-| Query                                    | Results                                        |
-| ---------------------------------------- | ---------------------------------------------- |
+
+| Query                                   | Results                                        |
+| --------------------------------------- | ---------------------------------------------- |
 | `--group "family" --search "outdoor"`   | Photos with zero & one (90% family confidence) |
-| `--person "zero" --person "one"`        | 8 photos showing both family members together   |
-| `--group "friends" --time "last month"` | Recent photos with friend group members         |
+| `--person "zero" --person "one"`        | 8 photos showing both family members together  |
+| `--group "friends" --time "last month"` | Recent photos with friend group members        |
 
 ## 🛠️ System Requirements
 
