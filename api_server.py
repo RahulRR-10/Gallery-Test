@@ -455,7 +455,9 @@ async def cluster_faces_background(task_id: str):
         result = subprocess.run(
             ["python", "final_photo_search.py", "--cluster-faces"],
             capture_output=True,
-            text=True
+            text=True,
+            encoding='utf-8',
+            errors='ignore'
         )
         
         if result.returncode == 0:
@@ -513,7 +515,7 @@ async def label_person(request: LabelPersonRequest):
         result = subprocess.run([
             "python", "final_photo_search.py", 
             "--label-person", request.cluster_id, request.name
-        ], capture_output=True, text=True)
+        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
         
         if result.returncode == 0:
             return {
@@ -575,7 +577,7 @@ async def build_relationships_background(task_id: str):
         # Build relationships
         result1 = subprocess.run([
             "python", "final_photo_search.py", "--build-relationships"
-        ], capture_output=True, text=True)
+        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
         
         if result1.returncode != 0:
             raise Exception(result1.stderr)
@@ -583,7 +585,7 @@ async def build_relationships_background(task_id: str):
         # Infer relationships
         result2 = subprocess.run([
             "python", "final_photo_search.py", "--infer-relationships"
-        ], capture_output=True, text=True)
+        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
         
         if result2.returncode == 0:
             background_tasks_status[task_id]["status"] = "completed"
