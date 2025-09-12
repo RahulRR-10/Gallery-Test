@@ -17,14 +17,15 @@ import json
 import traceback
 from pathlib import Path
 import logging
-
+from pydantic import BaseModel
+from typing import List
 # Import existing modules (keep all AI logic intact)
 from photo_database import PhotoDatabase
 from api_helpers import APIHelpers
 from final_photo_search import UltimatePhotoSearcher
 import relationship_mapping
 from temporal_search import TemporalParser
-
+import datetime
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -111,6 +112,14 @@ class ClusterResponse(BaseModel):
     label: Optional[str]
     photo_count: int
     sample_photos: List[str]
+
+class LabelRequest(BaseModel):
+    cluster_id: str
+    name: str
+
+class GroupRequest(BaseModel):
+    group_name: str
+    cluster_ids: List[str]
 
 # Background task tracking
 background_tasks_status = {}
@@ -394,14 +403,15 @@ async def get_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/photos/{photo_id}")
+@app.get("/api/photos/{photo_id}")
 async def get_photo_details(photo_id: int):
     """Get detailed information about a specific photo"""
     try:
         photo = api_helpers.get_photo_by_id(photo_id)
-        
+
         if not photo:
             raise HTTPException(status_code=404, detail="Photo not found")
-        
+
         return PhotoResponse(
             id=photo["id"],
             filename=os.path.basename(photo["path"]),
@@ -411,10 +421,13 @@ async def get_photo_details(photo_id: int):
             relationships=photo.get("relationships", []),
             timestamp=photo.get("timestamp")
         )
-        
+
+    except HTTPException as e:
+        raise e  # ✅ let FastAPI handle 404
     except Exception as e:
         logger.error(f"Photo details error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
 
 @app.post("/api/faces/cluster")
 async def cluster_faces(background_tasks: BackgroundTasks):
@@ -516,26 +529,25 @@ async def label_person(request: LabelPersonRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/groups/create")
-async def create_group(request: CreateGroupRequest):
-    """Create a new person group"""
-    try:
-        # Use existing CLI functionality
-        import subprocess
-        cmd = ["python", "final_photo_search.py", "--create-group", request.group_name] + request.cluster_ids
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        
-        if result.returncode == 0:
-            return {
-                "message": f"Created group '{request.group_name}'",
-                "group_name": request.group_name,
-                "cluster_ids": request.cluster_ids
-            }
-        else:
-            raise HTTPException(status_code=400, detail=result.stderr)
-            
-    except Exception as e:
-        logger.error(f"Create group error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+# ...existing code...
+
+def create_group(self, group_name: str, cluster_ids: list) -> bool:
+        """Create a new group with given cluster IDs"""
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                created_at = datetime.datetime.utcnow().isoformat()
+                cursor.execute("""
+                    INSERT INTO groups (group_name, cluster_ids, created_at)
+                    VALUES (?, ?, ?)
+                """, (group_name, json.dumps(cluster_ids), created_at))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error creating group {group_name}: {e}")
+            return False
+
+# ...existing code...
 
 @app.post("/api/relationships/build")
 async def build_relationships(background_tasks: BackgroundTasks):
@@ -612,6 +624,45 @@ async def serve_image(filename: str):
         raise HTTPException(status_code=404, detail="Image not found")
     
     return FileResponse(image_path)
+
+# ...existing code...
+
+@app.get("/api/faces/clusters")
+async def list_face_clusters():
+    """List all face clusters (people)"""
+    # Call synchronous helper directly
+    return {"clusters": api_helpers.get_face_clusters()}
+
+@app.post("/api/faces/clusters/{cluster_id}/label")
+async def label_face_cluster(cluster_id: str, request: LabelRequest):
+    """Label a person (face cluster)"""
+    # Update cluster label in database
+    api_helpers.label_face_cluster(cluster_id, request.name)
+    return {"success": True}
+
+@app.get("/api/groups")
+async def list_groups():
+    """List people groups (family, friends)"""
+    return {"groups": api_helpers.get_groups()}
+
+@app.post("/api/groups")
+async def create_group(request: GroupRequest):
+    """Create new people group"""
+    api_helpers.create_group(request.group_name, request.cluster_ids)
+    return {"success": True}
+
+@app.get("/api/relationships")
+async def list_relationships():
+    """List discovered relationships"""
+    return {"relationships": api_helpers.get_relationships()}
+
+@app.get("/api/relationships/{cluster_id}")
+async def get_relationships_for_person(cluster_id: str):
+    """Get relationships for a person"""
+    return {"relationships": api_helpers.get_relationships_for_person(cluster_id)}
+
+# ...existing code...
+
 
 if __name__ == "__main__":
     import uvicorn

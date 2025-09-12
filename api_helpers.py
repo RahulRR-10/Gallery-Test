@@ -342,3 +342,68 @@ class APIHelpers:
         except Exception as e:
             logger.error(f"Error getting relationships: {e}")
             return []
+# ...existing code...
+
+    def label_face_cluster(self, cluster_id: str, name: str) -> bool:
+        """Label a face cluster (person) with a name"""
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE face_clusters
+                    SET label = ?
+                    WHERE cluster_id = ?
+                """, (name, cluster_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error labeling cluster {cluster_id}: {e}")
+            return False
+
+    def create_group(self, group_name: str, cluster_ids: list) -> bool:
+        """Create a new group with given cluster IDs"""
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO groups (group_name, cluster_ids)
+                    VALUES (?, ?)
+                """, (group_name, json.dumps(cluster_ids)))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error creating group {group_name}: {e}")
+            return False
+
+    def get_relationships_for_person(self, cluster_id: str) -> list:
+        """Get relationships for a specific person (cluster)"""
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT r.cluster_id_a, r.cluster_id_b, ri.inferred_type, ri.confidence,
+                           c1.label as person1_label, c2.label as person2_label
+                    FROM relationships r
+                    LEFT JOIN relationship_inferences ri ON r.cluster_id_a = ri.cluster_id_a AND r.cluster_id_b = ri.cluster_id_b
+                    LEFT JOIN face_clusters c1 ON r.cluster_id_a = c1.cluster_id
+                    LEFT JOIN face_clusters c2 ON r.cluster_id_b = c2.cluster_id
+                    WHERE r.cluster_id_a = ? OR r.cluster_id_b = ?
+                    ORDER BY ri.confidence DESC
+                """, (cluster_id, cluster_id))
+                relationships = []
+                for row in cursor.fetchall():
+                    relationship = {
+                        "person1_cluster": row[0],
+                        "person2_cluster": row[1],
+                        "relationship_type": row[2] or "unknown",
+                        "confidence": row[3] or 0.0,
+                        "person1_label": row[4],
+                        "person2_label": row[5]
+                    }
+                    relationships.append(relationship)
+                return relationships
+        except Exception as e:
+            logger.error(f"Error getting relationships for cluster {cluster_id}: {e}")
+            return []
+
+# ...existing code...

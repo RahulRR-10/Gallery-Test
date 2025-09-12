@@ -35,7 +35,8 @@ uvicorn>=0.24.0                   # ASGI server
 python-multipart>=0.0.6           # File upload support
 pydantic>=2.4.0                   # Data validation
 python-jose[cryptography]>=3.3.0  # JWT tokens (optional for auth)
-
+httpx==0.28.1
+pytest==8.4.2
 # Version compatibility fixes
 ml-dtypes==0.2.0                  # Fix for ONNX compatibility
 onnx>=1.14.0,<1.15.0             # ONNX model format
