@@ -206,20 +206,33 @@ async def index_photos_background(task_id: str, directory: str, recursive: bool)
         total_files = len(photo_files)
         background_tasks_status[task_id]["total"] = total_files
         
-        # Index each photo
+        # Index each photo using the loaded searcher instance
         for i, photo_path in enumerate(photo_files):
             try:
-                # Use subprocess to call existing CLI functionality
-                import subprocess
-                result = subprocess.run([
-                    "python", "final_photo_search.py", "--index", photo_path
-                ], capture_output=True, text=True)
+                # Get the searcher instance (already loaded with models)
+                searcher = get_photo_searcher()
+                
+                if searcher:
+                    # Use the searcher's _process_single_image method directly
+                    logger.info(f"Indexing photo {i+1}/{total_files}: {photo_path}")
+                    
+                    # Process the photo using the loaded models
+                    result = searcher._process_single_image(photo_path)
+                    
+                    if result == "processed":
+                        logger.info(f"Successfully indexed: {photo_path}")
+                    elif result == "skipped":
+                        logger.info(f"Already indexed: {photo_path}")
+                    else:
+                        logger.warning(f"Unexpected result for {photo_path}: {result}")
+                else:
+                    logger.error("Searcher instance not available")
                 
                 progress = int((i + 1) / total_files * 100)
                 background_tasks_status[task_id]["progress"] = progress
                 
                 # Small delay to prevent overwhelming the system
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.2)
                 
             except Exception as e:
                 logger.warning(f"Failed to index {photo_path}: {e}")
