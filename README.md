@@ -1,97 +1,82 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+AI Photo Search Mobile App (React Native CLI)
 
-# Getting Started
+Features
+- Semantic photo search and gallery
+- Full photo viewer with objects and faces
+- People (face clusters), Groups, Relationships lists
+- Settings with backend URL tester and in-app user guide
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+Backend
+- Start: `python backend/start_api.py --host 0.0.0.0 --port 8000`
+- Use your PC LAN IP in the app Settings (e.g., http://192.168.1.10:8000)
 
-## Step 1: Start Metro
-
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+Run
+```bash
+cd frontend
+npm install
+npm run start # start Metro
+npm run android # or npm run ios
 ```
 
-## Step 2: Build and run your app
+Notes
+- Android/iOS dev allow HTTP to LAN for convenience. Use HTTPS for production.
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+### User Guide
 
-### Android
+#### 1) Prerequisites
+- Backend: Python 3.10+, install deps: `pip install -r backend/requirements.txt`
+- Mobile: Node 20+, Android Studio (for Android) and/or Xcode (for iOS)
 
-```sh
-# Using npm
+#### 2) Start the Backend
+```bash
+python backend/start_api.py --host 0.0.0.0 --port 8000
+```
+- Ensure your photos (or test images) are in `sample_photos/` so the app can load `/images/{filename}`.
+- Find your PC’s IP: `ipconfig` (Windows). Example: `192.168.1.10`.
+- Allow TCP port 8000 in your firewall for LAN access.
+
+#### 3) Run the App
+Android (device or emulator):
+```bash
+cd frontend
+npm install
+npm run start
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+iOS (macOS, Simulator or device):
+```bash
+cd frontend
+npm install
+# First time iOS setup
+cd ios && bundle install && bundle exec pod install && cd ..
+npm run start
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+#### 4) Configure the Backend URL in the App
+- Open the app → Settings → set Backend URL to `http://YOUR_PC_IP:8000` (e.g., `http://192.168.1.10:8000`).
+- Tap “Test Connection” and verify status is healthy.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+#### 5) Using the App
+- Search: Enter a query (e.g., “sunset beach”) and optional time filter (e.g., “last month”), then Search.
+- Gallery: Opens a grid of results; tap a photo to view details.
+- Photo Viewer: Shows the full image, objects, and faces detected.
+- People: Lists face clusters discovered by the backend.
+- Groups: Lists people groups from the backend.
+- Relationships: Lists inferred relationships with confidence scores.
 
-## Step 3: Modify your app
+Background tasks (run via backend):
+- Indexing: POST `/api/index` with a directory then poll `/api/tasks/{id}`.
+- Face clustering: POST `/api/faces/cluster`, then GET `/api/faces/clusters`.
+- Build relationships: POST `/api/relationships/build`.
 
-Now that you have successfully run the app, let's make changes!
+#### 6) Troubleshooting
+- Connection fails: confirm phone and PC are on the same Wi‑Fi, firewall allows port 8000, URL uses your LAN IP.
+- Images not loading: confirm files exist under `sample_photos/` and filenames from search results match `/images/{filename}`.
+- iOS device HTTP issues: consider a tunnel (e.g., `npx localtunnel --port 8000`) and use the provided HTTPS URL temporarily.
+- Metro issues: stop all node processes, then `npm run start -- --reset-cache`.
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+#### 7) Production Notes
+- Replace HTTP with HTTPS; remove cleartext/ATS relaxations.
+- Add auth if exposing the API outside your LAN.
