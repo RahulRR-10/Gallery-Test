@@ -1,4 +1,4 @@
-AI Photo Search Mobile App (React Native CLI)
+#AI Photo Search Mobile App (React Native CLI)
 
 Features
 - Semantic photo search and gallery
