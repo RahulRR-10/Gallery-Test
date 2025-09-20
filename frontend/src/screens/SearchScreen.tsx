@@ -35,22 +35,30 @@ export default function SearchScreen({ navigation }: Props) {
   const [group, setGroup] = useState('');
   const [relationship, setRelationship] = useState('');
 
-  const mutation = useMutation({ mutationFn: (payload: any) => searchPhotos(payload) });
-
-  const onSearch = () => mutation.mutate({
-    query: query || null,
-    person: person || null,
-    group: group || null,
-    relationship: relationship || null,
-    time_filter: timeFilter || null,
-    limit: 30,
+  const mutation = useMutation({
+    mutationFn: (payload: any) => searchPhotos(payload),
   });
+
+  const onSearch = () =>
+    mutation.mutate({
+      query: query || null,
+      person: person || null,
+      group: group || null,
+      relationship: relationship || null,
+      time_filter: timeFilter || null,
+      limit: 30,
+    });
 
   const results = mutation.data?.results || [];
 
   return (
     <View style={{ flex: 1 }}>
-      <AppHeader title="Photo Search" rightIcons={[{ name: 'cog', onPress: () => navigation.navigate('Settings') }]} />
+      <AppHeader
+        title="Photo Search"
+        rightIcons={[
+          { name: 'cog', onPress: () => navigation.navigate('Settings') },
+        ]}
+      />
       <SearchBar
         query={query}
         onQueryChange={setQuery}
@@ -67,24 +75,46 @@ export default function SearchScreen({ navigation }: Props) {
       <List.Section>
         <List.Subheader>Quick filters</List.Subheader>
         <View style={{ paddingHorizontal: 12 }}>
-          <Chip icon="calendar" mode="outlined" style={{ marginVertical: 6 }} onPress={() => setTimeFilter('today')}>Today</Chip>
-          <Chip icon="calendar-week" mode="outlined" style={{ marginVertical: 6 }} onPress={() => setTimeFilter('last week')}>Last week</Chip>
-          <Chip icon="calendar-month" mode="outlined" style={{ marginVertical: 6 }} onPress={() => setTimeFilter('last month')}>Last month</Chip>
+          <Chip
+            icon="calendar"
+            mode="outlined"
+            style={{ marginVertical: 6 }}
+            onPress={() => setTimeFilter('today')}
+          >
+            Today
+          </Chip>
+          <Chip
+            icon="calendar-week"
+            mode="outlined"
+            style={{ marginVertical: 6 }}
+            onPress={() => setTimeFilter('last week')}
+          >
+            Last week
+          </Chip>
+          <Chip
+            icon="calendar-month"
+            mode="outlined"
+            style={{ marginVertical: 6 }}
+            onPress={() => setTimeFilter('last month')}
+          >
+            Last month
+          </Chip>
         </View>
       </List.Section>
       {mutation.isLoading && <ActivityIndicator style={{ marginTop: 16 }} />}
       <List.Section>
         {results.map((p: any) => (
-          <List.Item 
-            key={p.id} 
-            title={getPhotoFilename(p)} 
-            description={getPhotoDisplayPath(p)} 
-            onPress={() => navigation.navigate('PhotoViewer', { photoId: p.id, photo: p })} 
-            left={(props) => <List.Icon {...props} icon="image" />} 
+          <List.Item
+            key={p.id}
+            title={getPhotoFilename(p)}
+            description={getPhotoDisplayPath(p)}
+            onPress={() =>
+              navigation.navigate('PhotoViewer', { photoId: p.id, photo: p })
+            }
+            left={props => <List.Icon {...props} icon="image" />}
           />
         ))}
       </List.Section>
     </View>
   );
 }
-

@@ -343,24 +343,42 @@ class APIHelpers:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
-                    SELECT r.cluster_id_a, r.cluster_id_b, ri.inferred_type, ri.confidence,
+                    SELECT r.cluster_id_a, r.cluster_id_b, r.count, r.weight,
                            c1.label as person1_label, c2.label as person2_label
                     FROM relationships r
-                    LEFT JOIN relationship_inferences ri ON r.cluster_id_a = ri.cluster_id_a AND r.cluster_id_b = ri.cluster_id_b
                     LEFT JOIN face_clusters c1 ON r.cluster_id_a = c1.cluster_id
                     LEFT JOIN face_clusters c2 ON r.cluster_id_b = c2.cluster_id
-                    ORDER BY ri.confidence DESC
+                    WHERE r.count > 0
+                    ORDER BY r.weight DESC, r.count DESC
                 """)
                 
                 relationships = []
                 for row in cursor.fetchall():
+                    # Infer relationship type based on photo count
+                    count = row[2] or 0
+                    weight = row[3] or 0.0
+                    
+                    # Simple relationship type inference
+                    if count >= 10:
+                        rel_type = "family"
+                        confidence = min(0.9, weight / 10.0)
+                    elif count >= 5:
+                        rel_type = "friend"
+                        confidence = min(0.7, weight / 5.0)
+                    elif count >= 2:
+                        rel_type = "acquaintance"
+                        confidence = min(0.5, weight / 2.0)
+                    else:
+                        rel_type = "unknown"
+                        confidence = 0.1
+                    
                     relationship = {
-                        "person1_cluster": row[0],
-                        "person2_cluster": row[1],
-                        "relationship_type": row[2] or "unknown",
-                        "confidence": row[3] or 0.0,
-                        "person1_label": row[4],
-                        "person2_label": row[5]
+                        "person1": row[4] or row[0],  # Use label if available, otherwise cluster_id
+                        "person2": row[5] or row[1],  # Use label if available, otherwise cluster_id
+                        "type": rel_type,
+                        "confidence": round(confidence, 2),
+                        "photo_count": count,
+                        "weight": round(weight, 2)
                     }
                     relationships.append(relationship)
                 

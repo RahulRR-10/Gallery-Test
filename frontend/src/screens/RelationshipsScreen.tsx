@@ -46,7 +46,12 @@ export default function RelationshipsScreen({ navigation }: any) {
       {isLoading && <ActivityIndicator style={{ marginTop: 16 }} />}
       <List.Section>
         {relationships.map((r: any, idx: number) => (
-          <List.Item key={idx} title={`${r.person1 ?? ''} - ${r.person2 ?? ''}`} description={`${r.type ?? ''} (${r.confidence ?? ''})`} left={(props) => <List.Icon {...props} icon="link" />} />
+          <List.Item 
+            key={`relationship-${idx}-${r.person1 || 'unknown'}-${r.person2 || 'unknown'}-${r.type || 'unknown'}`} 
+            title={`${r.person1 ?? ''} - ${r.person2 ?? ''}`} 
+            description={`${r.type ?? ''} (${r.confidence ?? ''})`} 
+            left={(props) => <List.Icon {...props} icon="link" />} 
+          />
         ))}
       </List.Section>
       <Button style={{ margin: 12 }} mode="contained" onPress={onBuild}>Build Relationships</Button>

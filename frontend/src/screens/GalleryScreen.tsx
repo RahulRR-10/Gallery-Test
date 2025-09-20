@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { FlatList, Image, TouchableOpacity, View, Dimensions, Alert, StyleSheet } from 'react-native';
+import {
+  FlatList,
+  Image,
+  TouchableOpacity,
+  View,
+  Dimensions,
+  Alert,
+  StyleSheet,
+} from 'react-native';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { useMutation } from '@tanstack/react-query';
 import { searchPhotos, getAllPhotos, API_BASE_URL } from '../services/api';
@@ -37,8 +45,10 @@ export default function GalleryScreen({ navigation, route }: Props) {
   const [photos, setPhotos] = useState<any[]>([]);
   const [showIndexingManager, setShowIndexingManager] = useState(false);
   const [isLoadingAll, setIsLoadingAll] = useState(false);
-  
-  const mutation = useMutation({ mutationFn: (payload: any) => searchPhotos(payload) });
+
+  const mutation = useMutation({
+    mutationFn: (payload: any) => searchPhotos(payload),
+  });
   const loadAllMutation = useMutation({ mutationFn: () => getAllPhotos() });
 
   React.useEffect(() => {
@@ -83,7 +93,10 @@ export default function GalleryScreen({ navigation, route }: Props) {
   const handleIndexingComplete = (indexedPhotos: any[]) => {
     setPhotos(indexedPhotos);
     setShowIndexingManager(false);
-    Alert.alert('Success', `Loaded ${indexedPhotos.length} photos into gallery!`);
+    Alert.alert(
+      'Success',
+      `Loaded ${indexedPhotos.length} photos into gallery!`,
+    );
   };
 
   const handleIndexingError = (error: string) => {
@@ -99,7 +112,7 @@ export default function GalleryScreen({ navigation, route }: Props) {
     return (
       <View style={{ flex: 1 }}>
         <AppHeader title="Gallery Setup" />
-        <IndexingManager 
+        <IndexingManager
           onIndexingComplete={handleIndexingComplete}
           onError={handleIndexingError}
         />
@@ -110,16 +123,14 @@ export default function GalleryScreen({ navigation, route }: Props) {
   return (
     <View style={{ flex: 1 }}>
       <AppHeader title="Gallery" />
-      
+
       {photos.length === 0 && !mutation.isLoading && !isLoadingAll && (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>
-            No photos found
-          </Text>
+          <Text style={styles.emptyTitle}>No photos found</Text>
           <Text style={styles.emptySubtitle}>
             Start indexing your photos to load them into the gallery
           </Text>
-          <Button 
+          <Button
             mode="contained"
             onPress={() => setShowIndexingManager(true)}
             style={styles.indexButton}
@@ -140,14 +151,12 @@ export default function GalleryScreen({ navigation, route }: Props) {
         <>
           <View style={styles.headerContainer}>
             <View style={styles.headerLeft}>
-              <Text style={styles.photoCount}>
-                {photos.length} photos
-              </Text>
+              <Text style={styles.photoCount}>{photos.length} photos</Text>
               <Text style={styles.lastUpdated}>
                 Last updated: {new Date().toLocaleTimeString()}
               </Text>
             </View>
-            <Button 
+            <Button
               mode="outlined"
               onPress={handleLoadAllPhotos}
               compact
@@ -159,8 +168,13 @@ export default function GalleryScreen({ navigation, route }: Props) {
           </View>
           <PhotoGrid
             data={photos}
-            getUri={(item) => getPhotoImageURL(item)}
-            onPress={(item) => navigation.navigate('PhotoViewer', { photoId: item.id, photo: item })}
+            getUri={item => getPhotoImageURL(item)}
+            onPress={item =>
+              navigation.navigate('PhotoViewer', {
+                photoId: item.id,
+                photo: item,
+              })
+            }
           />
         </>
       )}
@@ -232,4 +246,3 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
 });
-

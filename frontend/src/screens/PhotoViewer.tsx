@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
-import { Image, ScrollView, View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
-import { Chip, List, Text, Card, Divider, ActivityIndicator } from 'react-native-paper';
+import {
+  Image,
+  ScrollView,
+  View,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+} from 'react-native';
+import {
+  Chip,
+  List,
+  Text,
+  Card,
+  Divider,
+  ActivityIndicator,
+} from 'react-native-paper';
 import { API_BASE_URL, getPhoto } from '../services/api';
 import { getPhotoImageURL, getPhotoDisplayPath } from '../utils/photoUtils';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -24,8 +38,21 @@ export default function PhotoViewer({ navigation, route }: Props) {
   const [imageError, setImageError] = useState(false);
 
   React.useEffect(() => {
-    // Fetch details by id to ensure fresh data
-    getPhoto(photo.id || photo.photo_id).then(setDetails).catch(() => {});
+    // Only fetch details by id if we have a proper photo ID (not a filename)
+    const photoId = photo.id || photo.photo_id;
+    
+    // Check if photoId looks like a filename (contains file extension)
+    const isFilename = typeof photoId === 'string' && /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(photoId);
+    
+    if (photoId && !isFilename) {
+      // Fetch details by id to ensure fresh data
+      getPhoto(photoId)
+        .then(setDetails)
+        .catch((error) => {
+          console.log('Could not fetch photo details:', error);
+          // If we can't fetch details, use the provided photo object
+        });
+    }
   }, [photo.id, photo.photo_id]);
 
   // Use the photo utility to get the correct image URL
@@ -41,14 +68,17 @@ export default function PhotoViewer({ navigation, route }: Props) {
     if (!bytes) return 'Unknown size';
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(1024, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   return (
     <View style={styles.container}>
       <AppHeader title={photo.filename} />
-      
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Main Image */}
         <Card style={styles.imageCard} elevation={3}>
           <View style={styles.imageContainer}>
@@ -58,15 +88,15 @@ export default function PhotoViewer({ navigation, route }: Props) {
                 <Text style={styles.loadingText}>Loading image...</Text>
               </View>
             )}
-            
+
             {imageError ? (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorIcon}>📷</Text>
                 <Text style={styles.errorText}>Failed to load image</Text>
               </View>
             ) : (
-              <Image 
-                source={{ uri }} 
+              <Image
+                source={{ uri }}
                 style={styles.image}
                 onLoad={() => setImageLoading(false)}
                 onError={() => {
@@ -83,20 +113,24 @@ export default function PhotoViewer({ navigation, route }: Props) {
         <Card style={styles.infoCard} elevation={2}>
           <Card.Content>
             <Text style={styles.sectionTitle}>Photo Information</Text>
-            
+
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Filename:</Text>
               <Text style={styles.infoValue}>{photo.filename}</Text>
             </View>
-            
+
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Date:</Text>
-              <Text style={styles.infoValue}>{formatDate(photo.timestamp)}</Text>
+              <Text style={styles.infoValue}>
+                {formatDate(photo.timestamp)}
+              </Text>
             </View>
-            
+
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Path:</Text>
-              <Text style={styles.infoValue} numberOfLines={2}>{getPhotoDisplayPath(details)}</Text>
+              <Text style={styles.infoValue} numberOfLines={2}>
+                {getPhotoDisplayPath(details)}
+              </Text>
             </View>
           </Card.Content>
         </Card>
@@ -108,7 +142,11 @@ export default function PhotoViewer({ navigation, route }: Props) {
               <Text style={styles.sectionTitle}>Detected Objects</Text>
               <View style={styles.chipContainer}>
                 {details.objects.map((obj: string, idx: number) => (
-                  <Chip key={idx} style={styles.chip} textStyle={styles.chipText}>
+                  <Chip
+                    key={idx}
+                    style={styles.chip}
+                    textStyle={styles.chipText}
+                  >
                     {obj}
                   </Chip>
                 ))}
@@ -124,9 +162,7 @@ export default function PhotoViewer({ navigation, route }: Props) {
               <Text style={styles.sectionTitle}>Detected Faces</Text>
               {details.faces.map((face: any, i: number) => (
                 <View key={i} style={styles.faceItem}>
-                  <Text style={styles.faceTitle}>
-                    Face {i + 1}
-                  </Text>
+                  <Text style={styles.faceTitle}>Face {i + 1}</Text>
                   <Text style={styles.faceDetails}>
                     Cluster: {face.cluster_id || 'Unknown'}
                   </Text>
@@ -135,7 +171,9 @@ export default function PhotoViewer({ navigation, route }: Props) {
                       Confidence: {(face.confidence * 100).toFixed(1)}%
                     </Text>
                   )}
-                  {i < details.faces.length - 1 && <Divider style={styles.divider} />}
+                  {i < details.faces.length - 1 && (
+                    <Divider style={styles.divider} />
+                  )}
                 </View>
               ))}
             </Card.Content>
@@ -152,7 +190,9 @@ export default function PhotoViewer({ navigation, route }: Props) {
                   <Text style={styles.relationshipText}>
                     {rel.person1} → {rel.person2} ({rel.relationship_type})
                   </Text>
-                  {i < details.relationships.length - 1 && <Divider style={styles.divider} />}
+                  {i < details.relationships.length - 1 && (
+                    <Divider style={styles.divider} />
+                  )}
                 </View>
               ))}
             </Card.Content>
@@ -275,4 +315,3 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
   },
 });
-

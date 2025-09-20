@@ -457,7 +457,7 @@ async def get_photo_details(photo_id: str):
         logger.error(f"Photo details error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-
+# Face clustering endpoint
 @app.post("/api/faces/cluster")
 async def cluster_faces(background_tasks: BackgroundTasks):
     """Start face clustering process"""
@@ -479,15 +479,11 @@ async def cluster_faces(background_tasks: BackgroundTasks):
 async def cluster_faces_background(task_id: str):
     """Background task for face clustering"""
     try:
-        # Import and run clustering (keep existing logic)
         import subprocess
-        result = subprocess.run(
-            ["python", "final_photo_search.py", "--cluster-faces"],
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='ignore'
-        )
+        
+        result = subprocess.run([
+            "python", "final_photo_search.py", "--cluster-faces"
+        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
         
         if result.returncode == 0:
             background_tasks_status[task_id]["status"] = "completed"
@@ -499,153 +495,7 @@ async def cluster_faces_background(task_id: str):
         background_tasks_status[task_id]["status"] = "failed"
         background_tasks_status[task_id]["error"] = str(e)
 
-@app.get("/api/faces/clusters")
-async def list_face_clusters():
-    """List all face clusters"""
-    try:
-        clusters = api_helpers.get_face_clusters()
-        
-        cluster_responses = []
-        for cluster in clusters:
-            # Extract sample photos - handle both dict and string formats
-            sample_photos = cluster.get("sample_photos", [])
-            sample_paths = []
-            
-            if sample_photos:
-                # If it's a list of dicts, extract paths
-                if isinstance(sample_photos[0], dict):
-                    sample_paths = [photo.get("path", "") for photo in sample_photos[:5]]
-                else:
-                    # If it's already a list of strings, use as is
-                    sample_paths = sample_photos[:5]
-            
-            cluster_response = ClusterResponse(
-                cluster_id=cluster["cluster_id"],
-                label=cluster.get("label"),
-                photo_count=cluster.get("photo_count", 0),
-                sample_photos=sample_paths
-            )
-            cluster_responses.append(cluster_response)
-        
-        return {"clusters": cluster_responses}
-        
-    except Exception as e:
-        logger.error(f"List clusters error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/faces/label")
-async def label_person(request: LabelPersonRequest):
-    """Label a face cluster with a person name"""
-    try:
-        db = get_database()
-        
-        # Use existing CLI functionality
-        import subprocess
-        result = subprocess.run([
-            "python", "final_photo_search.py", 
-            "--label-person", request.cluster_id, request.name
-        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
-        
-        if result.returncode == 0:
-            return {
-                "message": f"Labeled cluster {request.cluster_id} as '{request.name}'",
-                "cluster_id": request.cluster_id,
-                "name": request.name
-            }
-        else:
-            raise HTTPException(status_code=400, detail=result.stderr)
-            
-    except Exception as e:
-        logger.error(f"Label person error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/groups/create")
-# ...existing code...
-
-def create_group(self, group_name: str, cluster_ids: list) -> bool:
-        """Create a new group with given cluster IDs"""
-        try:
-            with self.get_db_connection() as conn:
-                cursor = conn.cursor()
-                created_at = datetime.datetime.utcnow().isoformat()
-                cursor.execute("""
-                    INSERT INTO groups (group_name, cluster_ids, created_at)
-                    VALUES (?, ?, ?)
-                """, (group_name, json.dumps(cluster_ids), created_at))
-                conn.commit()
-                return cursor.rowcount > 0
-        except Exception as e:
-            logger.error(f"Error creating group {group_name}: {e}")
-            return False
-
-# ...existing code...
-
-@app.post("/api/relationships/build")
-async def build_relationships(background_tasks: BackgroundTasks):
-    """Build relationship graph"""
-    try:
-        task_id = f"relationships_{len(background_tasks_status)}"
-        background_tasks_status[task_id] = {"status": "running", "progress": 0}
-        
-        background_tasks.add_task(build_relationships_background, task_id)
-        
-        return {
-            "message": "Building relationships started",
-            "task_id": task_id
-        }
-        
-    except Exception as e:
-        logger.error(f"Build relationships error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-async def build_relationships_background(task_id: str):
-    """Background task for building relationships"""
-    try:
-        import subprocess
-        
-        # Build relationships
-        result1 = subprocess.run([
-            "python", "final_photo_search.py", "--build-relationships"
-        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
-        
-        if result1.returncode != 0:
-            raise Exception(result1.stderr)
-        
-        # Infer relationships
-        result2 = subprocess.run([
-            "python", "final_photo_search.py", "--infer-relationships"
-        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
-        
-        if result2.returncode == 0:
-            background_tasks_status[task_id]["status"] = "completed"
-        else:
-            background_tasks_status[task_id]["status"] = "failed"
-            background_tasks_status[task_id]["error"] = result2.stderr
-            
-    except Exception as e:
-        background_tasks_status[task_id]["status"] = "failed"
-        background_tasks_status[task_id]["error"] = str(e)
-
-@app.get("/api/groups")
-async def list_groups():
-    """List all groups"""
-    try:
-        groups = api_helpers.get_groups()
-        return {"groups": groups}
-    except Exception as e:
-        logger.error(f"List groups error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/relationships")
-async def list_relationships():
-    """List all relationships"""
-    try:
-        relationships = api_helpers.get_relationships()
-        return {"relationships": relationships}
-    except Exception as e:
-        logger.error(f"List relationships error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+# Static files endpoint
 @app.get("/images/{filename}")
 async def serve_image(filename: str):
     """Serve image files"""
@@ -655,8 +505,6 @@ async def serve_image(filename: str):
         raise HTTPException(status_code=404, detail="Image not found")
     
     return FileResponse(image_path)
-
-# ...existing code...
 
 @app.get("/api/faces/clusters")
 async def list_face_clusters():
@@ -691,6 +539,70 @@ async def list_relationships():
 async def get_relationships_for_person(cluster_id: str):
     """Get relationships for a person"""
     return {"relationships": api_helpers.get_relationships_for_person(cluster_id)}
+
+@app.post("/api/relationships/build")
+async def build_relationships(background_tasks: BackgroundTasks):
+    """Start relationship building process"""
+    try:
+        task_id = f"relationships_{len(background_tasks_status)}"
+        background_tasks_status[task_id] = {"status": "running", "progress": 0}
+        
+        background_tasks.add_task(build_relationships_background, task_id)
+        
+        return {
+            "message": "Relationship building started",
+            "task_id": task_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Build relationships error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def build_relationships_background(task_id: str):
+    """Background task for building relationships"""
+    try:
+        background_tasks_status[task_id]["status"] = "running"
+        background_tasks_status[task_id]["progress"] = 10
+        
+        logger.info("Starting relationship building process...")
+        
+        # Import the relationship mapper
+        from relationship_mapping import RelationshipMapper
+        
+        background_tasks_status[task_id]["progress"] = 20
+        
+        # Initialize the mapper
+        mapper = RelationshipMapper()
+        
+        background_tasks_status[task_id]["progress"] = 30
+        
+        # Build the co-occurrence graph
+        logger.info("Building co-occurrence graph...")
+        graph = mapper.build_cooccurrence_graph()
+        
+        if not graph or len(graph.nodes) == 0:
+            raise Exception("No relationships could be built - ensure faces are clustered first")
+        
+        background_tasks_status[task_id]["progress"] = 60
+        
+        # Update the relationships table in the database
+        logger.info("Updating relationships table...")
+        mapper.update_relationships_table(graph)
+        
+        background_tasks_status[task_id]["progress"] = 80
+        
+        # Save the graph for future use
+        mapper.save_graph(graph, "relationship_graph.json")
+        
+        background_tasks_status[task_id]["progress"] = 100
+        background_tasks_status[task_id]["status"] = "completed"
+        
+        logger.info(f"Relationship building completed: {len(graph.nodes)} people, {len(graph.edges)} relationships")
+        
+    except Exception as e:
+        background_tasks_status[task_id]["status"] = "failed"
+        background_tasks_status[task_id]["error"] = str(e)
+        logger.error(f"Background relationship building failed: {e}")
 
 # ...existing code...
 
