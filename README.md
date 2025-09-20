@@ -5,24 +5,28 @@ A comprehensive photo gallery application with advanced AI-powered features incl
 ## 🌟 Features
 
 ### 🔍 **Intelligent Search**
+
 - **Natural Language Search**: Search photos using descriptive text
 - **Object Detection**: Find photos containing specific objects (dogs, cars, etc.)
 - **Face Recognition**: Search by person using advanced face clustering
 - **Temporal Search**: Find photos from specific time periods
 
 ### 👥 **Face Recognition & People**
+
 - **Advanced Face Detection**: SOTA face detection using InsightFace
 - **Face Clustering**: Automatically group similar faces
 - **Person Labeling**: Label face clusters with names
 - **Relationship Mapping**: Discover relationships between people based on photo co-occurrence
 
 ### 📊 **Smart Organization**
+
 - **Auto-Indexing**: Automatically process and index photos
 - **Metadata Extraction**: Extract EXIF data, timestamps, and location info
 - **Event Detection**: Group photos into events based on time proximity
 - **Dynamic Galleries**: Browse photos by people, objects, or relationships
 
 ### 🔒 **Privacy-First Design**
+
 - **100% On-Device Processing**: All AI runs locally, no cloud uploads
 - **Biometric Data Protection**: Face embeddings stored locally only
 - **User Consent**: Explicit opt-in for face processing
@@ -55,18 +59,21 @@ A comprehensive photo gallery application with advanced AI-powered features incl
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Node.js** 16+ 
+
+- **Node.js** 16+
 - **Python** 3.8+
 - **React Native** development environment
 - **Android Studio** (for Android) or **Xcode** (for iOS)
 
 ### 1. Clone Repository
+
 ```bash
 git clone https://github.com/RahulRR-10/Gallery-Test.git
 cd Gallery-Test
 ```
 
 ### 2. Backend Setup
+
 ```bash
 cd backend
 
@@ -78,6 +85,7 @@ python -m uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### 3. Frontend Setup
+
 ```bash
 cd frontend
 
@@ -95,13 +103,15 @@ npm run ios
 ```
 
 ### 4. Configuration
+
 Update the IP address in `frontend/src/config/environment.ts`:
+
 ```typescript
 const Config = {
   development: {
-    localIP: 'YOUR_COMPUTER_IP_ADDRESS', // Update this!
+    localIP: "YOUR_COMPUTER_IP_ADDRESS", // Update this!
     localPort: 8000,
-  }
+  },
 };
 ```
 
@@ -151,41 +161,49 @@ Gallery-Test/
 ## 🔧 API Endpoints
 
 ### Photos
+
 - `GET /api/photos` - Get all photos
 - `GET /api/photos/{id}` - Get specific photo details
 - `POST /api/search` - Search photos with various criteria
 
 ### Indexing
+
 - `POST /api/index` - Start photo indexing process
 - `GET /api/tasks/{task_id}` - Check indexing progress
 
 ### Face Recognition
+
 - `GET /api/faces/clusters` - Get face clusters (people)
 - `POST /api/faces/cluster` - Start face clustering
 - `POST /api/faces/label` - Label a person
 
 ### Relationships
+
 - `GET /api/relationships` - Get discovered relationships
 - `POST /api/relationships/build` - Build relationship graph
 
 ### System
+
 - `GET /api/status` - API health check
 - `GET /api/stats` - System statistics
 
 ## 🤖 AI Components
 
 ### Face Detection (InsightFace)
+
 - **Detection Model**: Buffalo_L for high accuracy
 - **Recognition Model**: W600K_R50 for face embeddings
 - **Age/Gender**: Optional demographic analysis
 - **Clustering**: DBSCAN algorithm for grouping faces
 
 ### Object Detection (YOLOv8)
+
 - **Model**: YOLOv8x for comprehensive object detection
 - **Classes**: 80+ object categories (COCO dataset)
 - **Performance**: Optimized for on-device inference
 
 ### Search System
+
 - **CLIP Model**: For natural language to image search
 - **Vector Similarity**: Cosine similarity for semantic matching
 - **Temporal Parsing**: Natural language time expressions
@@ -194,6 +212,7 @@ Gallery-Test/
 ## 🗄️ Database Schema
 
 ### Photos Table
+
 ```sql
 CREATE TABLE photos (
     id TEXT PRIMARY KEY,
@@ -206,6 +225,7 @@ CREATE TABLE photos (
 ```
 
 ### Face Clusters Table
+
 ```sql
 CREATE TABLE face_clusters (
     cluster_id TEXT PRIMARY KEY,
@@ -216,6 +236,7 @@ CREATE TABLE face_clusters (
 ```
 
 ### Relationships Table
+
 ```sql
 CREATE TABLE relationships (
     cluster_id_a TEXT,
@@ -229,21 +250,25 @@ CREATE TABLE relationships (
 ## 🎯 Usage Examples
 
 ### Basic Photo Browsing
+
 1. **Index Photos**: Place photos in `backend/sample_photos/`
 2. **Start Indexing**: Use the "Gallery Setup" in the app
 3. **Browse**: Photos appear in the main gallery
 
 ### Face Recognition
+
 1. **Cluster Faces**: Go to "People" tab → "Cluster Faces"
 2. **Label People**: Tap on face clusters to add names
 3. **Search by Person**: Use the search to find specific people
 
 ### Relationship Discovery
+
 1. **Build Relationships**: Go to "Relationships" → "Build Relationships"
 2. **View Results**: See inferred relationships between people
 3. **Relationship Types**: family, friend, acquaintance based on co-occurrence
 
 ### Advanced Search
+
 ```
 Search Examples:
 • "dogs playing in the park"
@@ -256,6 +281,7 @@ Search Examples:
 ## 🔨 Development
 
 ### Backend Development
+
 ```bash
 cd backend
 
@@ -273,6 +299,7 @@ curl http://localhost:8000/api/status
 ```
 
 ### Frontend Development
+
 ```bash
 cd frontend
 
@@ -293,6 +320,7 @@ npm start -- --reset-cache
 ```
 
 ### Testing Face Recognition
+
 ```bash
 cd backend
 
@@ -308,6 +336,7 @@ python relationship_mapping.py
 ### Common Issues
 
 #### Backend Not Starting
+
 ```bash
 # Check Python version
 python --version  # Should be 3.8+
@@ -320,17 +349,19 @@ netstat -an | grep 8000
 ```
 
 #### Frontend Connection Issues
+
 ```typescript
 // Update IP address in frontend/src/config/environment.ts
 const Config = {
   development: {
-    localIP: '192.168.1.100', // Your actual IP
+    localIP: "192.168.1.100", // Your actual IP
     localPort: 8000,
-  }
+  },
 };
 ```
 
 #### Face Detection Not Working
+
 ```bash
 # Install InsightFace models (first run)
 # Models will be downloaded automatically to ~/.insightface/
@@ -340,6 +371,7 @@ ls ~/.insightface/models/buffalo_l/
 ```
 
 #### Photos Not Loading
+
 1. Check photo paths in `sample_photos/` directory
 2. Ensure backend is serving static files at `/images`
 3. Verify photo permissions and file formats (JPG, PNG)
@@ -347,11 +379,13 @@ ls ~/.insightface/models/buffalo_l/
 ### Performance Optimization
 
 #### Backend
+
 - Use GPU acceleration for face detection (if available)
 - Adjust batch sizes for large photo collections
 - Monitor memory usage during indexing
 
 #### Frontend
+
 - Enable Hermes engine for better performance
 - Use image caching for faster loading
 - Implement pagination for large galleries
@@ -359,6 +393,7 @@ ls ~/.insightface/models/buffalo_l/
 ## 🚀 Deployment
 
 ### Production Backend
+
 ```bash
 # Install production dependencies
 pip install gunicorn
@@ -372,6 +407,7 @@ docker run -p 8000:8000 photo-gallery-backend
 ```
 
 ### Production Frontend
+
 ```bash
 # Build release APK (Android)
 cd android
@@ -405,6 +441,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 For support and questions:
+
 - Create an issue on GitHub
 - Check the troubleshooting section
 - Review the API documentation
@@ -412,6 +449,7 @@ For support and questions:
 ## 🔮 Roadmap
 
 ### Upcoming Features
+
 - [ ] **Advanced Relationship Types**: Detect family relationships (parent/child, siblings)
 - [ ] **Event Timeline**: Automatic event detection and timeline view
 - [ ] **Location Clustering**: Group photos by location using GPS data
@@ -422,6 +460,7 @@ For support and questions:
 - [ ] **Advanced Filters**: More sophisticated search filters
 
 ### Technical Improvements
+
 - [ ] **Performance**: GPU acceleration for mobile devices
 - [ ] **Offline AI**: Improved on-device model optimization
 - [ ] **Real-time Processing**: Live photo analysis during capture

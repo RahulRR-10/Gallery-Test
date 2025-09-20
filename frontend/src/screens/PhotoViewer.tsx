@@ -40,15 +40,17 @@ export default function PhotoViewer({ navigation, route }: Props) {
   React.useEffect(() => {
     // Only fetch details by id if we have a proper photo ID (not a filename)
     const photoId = photo.id || photo.photo_id;
-    
+
     // Check if photoId looks like a filename (contains file extension)
-    const isFilename = typeof photoId === 'string' && /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(photoId);
-    
+    const isFilename =
+      typeof photoId === 'string' &&
+      /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(photoId);
+
     if (photoId && !isFilename) {
       // Fetch details by id to ensure fresh data
       getPhoto(photoId)
         .then(setDetails)
-        .catch((error) => {
+        .catch(error => {
           console.log('Could not fetch photo details:', error);
           // If we can't fetch details, use the provided photo object
         });

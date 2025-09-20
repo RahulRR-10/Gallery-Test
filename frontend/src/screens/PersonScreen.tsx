@@ -43,7 +43,7 @@ export default function PersonScreen({ navigation, route }: any) {
     if (typeof photo === 'string') {
       // Extract filename from path
       const filename = photo.split(/[/\\]/).pop() || photo;
-      
+
       navigation.navigate('PhotoViewer', {
         photoId: filename, // Use filename as ID for cluster photos
         photo: {

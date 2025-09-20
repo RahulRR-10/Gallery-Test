@@ -8,7 +8,10 @@ import AppHeader from '../components/AppHeader';
 import FullscreenLoader from '../components/FullscreenLoader';
 
 export default function RelationshipsScreen({ navigation }: any) {
-  const { data, isLoading, refetch } = useQuery({ queryKey: ['relationships'], queryFn: getRelationships });
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['relationships'],
+    queryFn: getRelationships,
+  });
   const relationships = data?.relationships || [];
   const [taskId, setTaskId] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState<any>(null);
@@ -42,20 +45,27 @@ export default function RelationshipsScreen({ navigation }: any) {
   return (
     <View style={{ flex: 1 }}>
       <AppHeader title="Relationships" />
-      <FullscreenLoader visible={!!taskId && taskStatus?.status === 'running'} title="Building relationships" progress={taskStatus?.progress} />
+      <FullscreenLoader
+        visible={!!taskId && taskStatus?.status === 'running'}
+        title="Building relationships"
+        progress={taskStatus?.progress}
+      />
       {isLoading && <ActivityIndicator style={{ marginTop: 16 }} />}
       <List.Section>
         {relationships.map((r: any, idx: number) => (
-          <List.Item 
-            key={`relationship-${idx}-${r.person1 || 'unknown'}-${r.person2 || 'unknown'}-${r.type || 'unknown'}`} 
-            title={`${r.person1 ?? ''} - ${r.person2 ?? ''}`} 
-            description={`${r.type ?? ''} (${r.confidence ?? ''})`} 
-            left={(props) => <List.Icon {...props} icon="link" />} 
+          <List.Item
+            key={`relationship-${idx}-${r.person1 || 'unknown'}-${
+              r.person2 || 'unknown'
+            }-${r.type || 'unknown'}`}
+            title={`${r.person1 ?? ''} - ${r.person2 ?? ''}`}
+            description={`${r.type ?? ''} (${r.confidence ?? ''})`}
+            left={props => <List.Icon {...props} icon="link" />}
           />
         ))}
       </List.Section>
-      <Button style={{ margin: 12 }} mode="contained" onPress={onBuild}>Build Relationships</Button>
+      <Button style={{ margin: 12 }} mode="contained" onPress={onBuild}>
+        Build Relationships
+      </Button>
     </View>
   );
 }
-
