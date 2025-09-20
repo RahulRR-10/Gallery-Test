@@ -1,0 +1,85 @@
+/**
+ * Environment Configuration for API Connectivity
+ * Handles dynamic API base URL configuration for different environments
+ */
+
+import { Platform } from 'react-native';
+
+/**
+ * Configuration options for different environments
+ */
+const Config = {
+  development: {
+    // Local development - use your computer's IP address
+    localIP: '192.168.68.107', // Update this when your IP changes
+    localPort: 8000,
+    
+    // Alternative: ngrok URL for external access
+    ngrokURL: 'https://99bbe5275a1f.ngrok-free.app',
+    
+    timeout: 20000,
+  },
+  production: {
+    // Production server URL
+    baseURL: 'https://your-production-api.com',
+    timeout: 10000,
+  },
+};
+
+/**
+ * Get the appropriate API base URL
+ */
+export const getAPIBaseURL = (): string => {
+  const isDevelopment = __DEV__;
+  
+  if (isDevelopment) {
+    const { localIP, localPort, ngrokURL } = Config.development;
+    
+    // Priority order:
+    // 1. Use ngrok URL if available (for external access)
+    // 2. Fall back to local IP (for same network access)
+    
+    if (ngrokURL && ngrokURL !== 'https://99bbe5275a1f.ngrok-free.app') {
+      // Use ngrok if you've updated it with a real URL
+      return ngrokURL;
+    } else {
+      // Use local IP address
+      return `http://${localIP}:${localPort}`;
+    }
+  } else {
+    // Production environment
+    return Config.production.baseURL;
+  }
+};
+
+/**
+ * Get timeout value for current environment
+ */
+export const getTimeout = (): number => {
+  const isDevelopment = __DEV__;
+  return isDevelopment ? Config.development.timeout : Config.production.timeout;
+};
+
+/**
+ * Update local IP when it changes
+ */
+export const updateLocalIP = (newIP: string): void => {
+  Config.development.localIP = newIP;
+};
+
+/**
+ * Update ngrok URL when you get a new tunnel
+ */
+export const updateNgrokURL = (newURL: string): void => {
+  Config.development.ngrokURL = newURL;
+};
+
+/**
+ * Current API configuration
+ */
+export const API_CONFIG = {
+  baseURL: getAPIBaseURL(),
+  timeout: getTimeout(),
+};
+
+export default Config;
