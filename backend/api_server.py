@@ -463,7 +463,11 @@ async def cluster_faces(background_tasks: BackgroundTasks):
     """Start face clustering process"""
     try:
         task_id = f"cluster_{len(background_tasks_status)}"
-        background_tasks_status[task_id] = {"status": "running", "progress": 0}
+        background_tasks_status[task_id] = {
+            "status": "running", 
+            "progress": 0,
+            "message": "Initializing face clustering process..."
+        }
         
         background_tasks.add_task(cluster_faces_background, task_id)
         
@@ -477,23 +481,50 @@ async def cluster_faces(background_tasks: BackgroundTasks):
         raise HTTPException(status_code=500, detail=str(e))
 
 async def cluster_faces_background(task_id: str):
-    """Background task for face clustering"""
+    """Background task for complete face detection and clustering"""
     try:
         import subprocess
         
-        result = subprocess.run([
+        # Update progress: Starting face detection
+        background_tasks_status[task_id]["progress"] = 10
+        background_tasks_status[task_id]["message"] = "Starting face detection..."
+        
+        # Step 1: Run face detection on all photos
+        logger.info(f"Task {task_id}: Starting face detection (backfill-faces)")
+        detection_result = subprocess.run([
+            "python", "final_photo_search.py", "--backfill-faces"
+        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        
+        if detection_result.returncode != 0:
+            background_tasks_status[task_id]["status"] = "failed"
+            background_tasks_status[task_id]["error"] = f"Face detection failed: {detection_result.stderr}"
+            logger.error(f"Task {task_id}: Face detection failed - {detection_result.stderr}")
+            return
+            
+        # Update progress: Face detection complete, starting clustering
+        background_tasks_status[task_id]["progress"] = 60
+        background_tasks_status[task_id]["message"] = "Face detection complete. Starting clustering..."
+        logger.info(f"Task {task_id}: Face detection complete, starting clustering")
+        
+        # Step 2: Run face clustering
+        clustering_result = subprocess.run([
             "python", "final_photo_search.py", "--cluster-faces"
         ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
         
-        if result.returncode == 0:
+        if clustering_result.returncode == 0:
             background_tasks_status[task_id]["status"] = "completed"
+            background_tasks_status[task_id]["progress"] = 100
+            background_tasks_status[task_id]["message"] = "Face clustering completed successfully!"
+            logger.info(f"Task {task_id}: Face clustering completed successfully")
         else:
             background_tasks_status[task_id]["status"] = "failed"
-            background_tasks_status[task_id]["error"] = result.stderr
+            background_tasks_status[task_id]["error"] = f"Face clustering failed: {clustering_result.stderr}"
+            logger.error(f"Task {task_id}: Face clustering failed - {clustering_result.stderr}")
             
     except Exception as e:
         background_tasks_status[task_id]["status"] = "failed"
         background_tasks_status[task_id]["error"] = str(e)
+        logger.error(f"Task {task_id}: Exception occurred - {str(e)}")
 
 # Static files endpoint
 @app.get("/images/{filename}")

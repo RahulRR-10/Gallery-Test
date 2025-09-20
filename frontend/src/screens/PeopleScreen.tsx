@@ -32,14 +32,24 @@ export default function PeopleScreen({ navigation }: any) {
           if (s.status !== 'completed' && s.status !== 'failed') {
             t = setTimeout(poll, 1500);
           } else if (s.status === 'completed') {
-            refetch();
+            // Clear task state and refetch data
+            setTaskId(null);
+            setTaskStatus(null);
+            // Small delay to ensure backend is ready, then refetch
+            setTimeout(() => {
+              refetch();
+            }, 500);
+          } else if (s.status === 'failed') {
+            // Clear task state on failure
+            setTaskId(null);
+            setTaskStatus(null);
           }
         } catch {}
       };
       poll();
     }
     return () => t && clearTimeout(t);
-  }, [taskId]);
+  }, [taskId, refetch]);
 
   // Function to get the URI for a cluster's sample photo
   const getClusterPhotoUri = (item: any) => {
@@ -57,7 +67,12 @@ export default function PeopleScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <AppHeader title="People" />
-      <FullscreenLoader visible={!!taskId && taskStatus?.status === 'running'} title="Clustering faces" progress={taskStatus?.progress} />
+      <FullscreenLoader 
+        visible={!!taskId && taskStatus?.status === 'running'} 
+        title="Clustering faces" 
+        progress={taskStatus?.progress}
+        message={taskStatus?.message} 
+      />
       {isLoading && <ActivityIndicator style={{ marginTop: 16 }} />}
       
       {clusters.length === 0 && !isLoading ? (

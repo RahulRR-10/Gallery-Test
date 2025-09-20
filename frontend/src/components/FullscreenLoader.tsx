@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 
-type Props = { visible: boolean; title?: string; progress?: number };
+type Props = { visible: boolean; title?: string; progress?: number; message?: string };
 
-export default function FullscreenLoader({ visible, title, progress }: Props) {
+export default function FullscreenLoader({ visible, title, progress, message }: Props) {
   if (!visible) return null;
   return (
     <View style={styles.overlay}>
@@ -15,6 +15,7 @@ export default function FullscreenLoader({ visible, title, progress }: Props) {
             <View style={[styles.progressBar, { width: `${progress}%` }]} />
           </View>
         )}
+        {!!message && <Text style={styles.message}>{message}</Text>}
       </View>
     </View>
   );
@@ -61,6 +62,12 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#007AFF',
     borderRadius: 4,
+  },
+  message: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 12,
   },
 });
 
