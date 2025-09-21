@@ -30,6 +30,9 @@ import json
 from sklearn.cluster import DBSCAN
 from datetime import datetime
 
+# Setup logging for this module
+logger = logging.getLogger(__name__)
+
 # Import our components
 from clip_model import CLIPEmbeddingExtractor
 from photo_database import PhotoDatabase
@@ -280,6 +283,22 @@ class UltimatePhotoSearcher:
         print(f"   Errors: {stats['errors']}")
         
         return stats
+    
+    def index_single_photo(self, image_path: str) -> bool:
+        """Index a single photo with complete AI analysis
+        
+        Args:
+            image_path: Path to the image file to index
+            
+        Returns:
+            bool: True if successfully indexed, False otherwise
+        """
+        try:
+            result = self._process_single_image(image_path)
+            return result == "processed"
+        except Exception as e:
+            logger.error(f"Failed to index single photo {image_path}: {e}")
+            return False
     
     def _process_single_image(self, image_path: str) -> str:
         """Process a single image with all AI enhancements"""

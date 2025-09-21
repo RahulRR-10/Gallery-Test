@@ -26,6 +26,8 @@ from final_photo_search import UltimatePhotoSearcher
 import relationship_mapping
 from temporal_search import TemporalParser
 import datetime
+# Import auto-indexing functionality
+from auto_photo_indexer import start_auto_indexing, stop_auto_indexing, get_auto_indexing_status
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -307,7 +309,7 @@ async def search_photos(request: SearchRequest):
                     faces = []
             
             photo_response = PhotoResponse(
-                id=result.get("id", 0),
+                id=str(result.get("id", "")),
                 filename=os.path.basename(result.get("path", "")),
                 path=result.get("path", ""),
                 similarity_score=result.get("similarity", 0.0),
@@ -481,45 +483,37 @@ async def cluster_faces(background_tasks: BackgroundTasks):
         raise HTTPException(status_code=500, detail=str(e))
 
 async def cluster_faces_background(task_id: str):
-    """Background task for complete face detection and clustering"""
+    """Fast optimized clustering using dedicated script"""
     try:
         import subprocess
+        import os
         
-        # Update progress: Starting face detection
+        # Update progress: Starting face detection and clustering
         background_tasks_status[task_id]["progress"] = 10
-        background_tasks_status[task_id]["message"] = "Starting face detection..."
+        background_tasks_status[task_id]["message"] = "Starting fast face clustering..."
+        logger.info(f"Task {task_id}: Starting fast clustering process")
         
-        # Step 1: Run face detection on all photos
-        logger.info(f"Task {task_id}: Starting face detection (backfill-faces)")
-        detection_result = subprocess.run([
-            "python", "final_photo_search.py", "--backfill-faces"
-        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        # Set environment for proper encoding
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONLEGACYWINDOWSSTDIO'] = '1'
         
-        if detection_result.returncode != 0:
-            background_tasks_status[task_id]["status"] = "failed"
-            background_tasks_status[task_id]["error"] = f"Face detection failed: {detection_result.stderr}"
-            logger.error(f"Task {task_id}: Face detection failed - {detection_result.stderr}")
-            return
-            
-        # Update progress: Face detection complete, starting clustering
-        background_tasks_status[task_id]["progress"] = 60
-        background_tasks_status[task_id]["message"] = "Face detection complete. Starting clustering..."
-        logger.info(f"Task {task_id}: Face detection complete, starting clustering")
+        # Run fast clustering script that does both detection and clustering
+        result = subprocess.run([
+            "python", os.path.join(os.path.dirname(__file__), "fast_clustering.py"), "--all"
+        ], capture_output=True, text=True, encoding='utf-8', errors='replace', 
+        cwd=os.path.dirname(__file__), env=env)
         
-        # Step 2: Run face clustering
-        clustering_result = subprocess.run([
-            "python", "final_photo_search.py", "--cluster-faces"
-        ], capture_output=True, text=True, encoding='utf-8', errors='ignore')
-        
-        if clustering_result.returncode == 0:
+        if result.returncode == 0:
             background_tasks_status[task_id]["status"] = "completed"
             background_tasks_status[task_id]["progress"] = 100
             background_tasks_status[task_id]["message"] = "Face clustering completed successfully!"
-            logger.info(f"Task {task_id}: Face clustering completed successfully")
+            logger.info(f"Task {task_id}: Fast clustering completed successfully")
+            logger.info(f"Clustering output: {result.stdout}")
         else:
             background_tasks_status[task_id]["status"] = "failed"
-            background_tasks_status[task_id]["error"] = f"Face clustering failed: {clustering_result.stderr}"
-            logger.error(f"Task {task_id}: Face clustering failed - {clustering_result.stderr}")
+            background_tasks_status[task_id]["error"] = f"Fast clustering failed: {result.stderr}"
+            logger.error(f"Task {task_id}: Fast clustering failed - {result.stderr}")
             
     except Exception as e:
         background_tasks_status[task_id]["status"] = "failed"
@@ -634,6 +628,43 @@ async def build_relationships_background(task_id: str):
         background_tasks_status[task_id]["status"] = "failed"
         background_tasks_status[task_id]["error"] = str(e)
         logger.error(f"Background relationship building failed: {e}")
+
+# Auto-indexing endpoints
+@app.post("/api/auto-index/start")
+async def start_auto_index():
+    """Start automatic photo indexing service"""
+    try:
+        status = start_auto_indexing()
+        return {
+            "message": "Auto-indexing started successfully",
+            "status": status
+        }
+    except Exception as e:
+        logger.error(f"Failed to start auto-indexing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auto-index/stop")
+async def stop_auto_index():
+    """Stop automatic photo indexing service"""
+    try:
+        status = stop_auto_indexing()
+        return {
+            "message": "Auto-indexing stopped successfully",
+            "status": status
+        }
+    except Exception as e:
+        logger.error(f"Failed to stop auto-indexing: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/auto-index/status")
+async def get_auto_index_status():
+    """Get current auto-indexing status"""
+    try:
+        status = get_auto_indexing_status()
+        return status
+    except Exception as e:
+        logger.error(f"Failed to get auto-indexing status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ...existing code...
 
