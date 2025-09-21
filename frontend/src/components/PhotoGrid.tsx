@@ -106,10 +106,24 @@ function PhotoItem({ item, getUri, onPress }: PhotoItemProps) {
 }
 
 export default function PhotoGrid({ data, getUri, onPress }: Props) {
+  // Create a robust key extractor that handles both photos and clusters
+  const keyExtractor = (item: any, index: number) => {
+    // For face clusters
+    if (item.cluster_id) {
+      return `cluster_${item.cluster_id}`;
+    }
+    // For regular photos
+    if (item.id) {
+      return `photo_${item.id}`;
+    }
+    // Fallback to index if no unique identifier
+    return `item_${index}`;
+  };
+
   return (
     <FlatList
       data={data}
-      keyExtractor={(item) => String(item.id)}
+      keyExtractor={keyExtractor}
       numColumns={numColumns}
       contentContainerStyle={styles.gridContainer}
       columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
