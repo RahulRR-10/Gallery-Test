@@ -47,7 +47,17 @@ export const getTask = async (taskId: string) => {
 };
 
 export const startFaceClustering = async () => (await api.post('/faces/cluster')).data;
-export const getFaceClusters = async () => (await api.get('/faces/clusters')).data;
+
+export const getFaceClusters = async () => {
+  try {
+    const response = await api.get('/faces/clusters');
+    console.log('getFaceClusters response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('getFaceClusters error:', error);
+    throw error;
+  }
+};
 export const labelFaceCluster = async (cluster_id: string, name: string) =>
   (await api.post('/faces/label', { cluster_id, name })).data;
 
