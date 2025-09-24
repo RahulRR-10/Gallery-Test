@@ -1,7 +1,7 @@
 # OSX
 #
 .DS_Store
-
+frontend/.env
 # Xcode
 #
 build/

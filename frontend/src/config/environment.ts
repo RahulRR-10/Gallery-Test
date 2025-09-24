@@ -4,14 +4,15 @@
  */
 
 import { Platform } from 'react-native';
+import { LOCAL_IP } from '@env';
 
 /**
  * Configuration options for different environments
  */
 const Config = {
   development: {
-    // Local development - use your computer's IP address
-    localIP: '192.168.0.104', // Updated to current IP address
+    // Local development - use your computer's IP address from environment variables
+    localIP: LOCAL_IP || '192.168.0.104', // Fallback to default IP
     localPort: 8000,
     
     // Alternative: ngrok URL for external access
