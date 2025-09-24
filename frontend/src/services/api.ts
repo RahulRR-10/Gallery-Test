@@ -21,7 +21,7 @@ export const searchPhotos = async (payload: {
 }) => (await api.post('/search', payload)).data;
 
 export const getPhoto = async (id: number) => (await api.get(`/photos/${id}`)).data;
-export const getAllPhotos = async (limit = 20, offset = 0) => {
+export const getAllPhotos = async (limit = 1000, offset = 0) => {
   try {
     console.log(`Fetching photos with limit: ${limit}, offset: ${offset}`);
     const response = await api.get(`/photos?limit=${limit}&offset=${offset}`);
@@ -77,4 +77,9 @@ export const getGroups = async () => (await api.get('/groups')).data;
 
 export const buildRelationships = async () => (await api.post('/relationships/build')).data;
 export const getRelationships = async () => (await api.get('/relationships')).data;
+
+// Auto-indexing APIs
+export const startAutoIndexing = async () => (await api.post('/auto-index/start')).data;
+export const stopAutoIndexing = async () => (await api.post('/auto-index/stop')).data;
+export const getAutoIndexingStatus = async () => (await api.get('/auto-index/status')).data;
 

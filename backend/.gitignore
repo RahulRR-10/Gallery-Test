@@ -6,6 +6,7 @@ yolov8x.pt
 *.h5
 *.pkl
 *.joblib
+.env
 
 # Photo directories and media files
 sample_photos/

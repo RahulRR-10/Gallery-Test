@@ -146,6 +146,14 @@ async def startup_event():
     if os.path.exists("sample_photos"):
         app.mount("/images", StaticFiles(directory="sample_photos"), name="images")
     
+    # Start auto-indexing service
+    try:
+        os.makedirs("sample_photos", exist_ok=True)
+        start_auto_indexing()
+        logger.info("✅ Auto-indexing service started - monitoring sample_photos/")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not start auto-indexing: {e}")
+    
     logger.info("API started successfully")
 
 @app.get("/")
@@ -570,7 +578,7 @@ async def get_stats():
 
 @app.get("/api/photos")
 async def get_all_photos(
-    limit: int = Query(20, description="Number of photos per page", ge=1, le=100),
+    limit: int = Query(1000, description="Number of photos per page", ge=1, le=10000),
     offset: int = Query(0, description="Starting offset for pagination", ge=0)
 ):
     """Get all photos with pagination"""

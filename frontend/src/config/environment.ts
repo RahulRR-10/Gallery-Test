@@ -12,7 +12,7 @@ import { LOCAL_IP } from '@env';
 const Config = {
   development: {
     // Local development - use your computer's IP address from environment variables
-    localIP: LOCAL_IP || '192.168.0.104', // Fallback to default IP
+    localIP: LOCAL_IP || '192.168.68.107', // Fallback to default IP
     localPort: 8000,
     
     // Alternative: ngrok URL for external access

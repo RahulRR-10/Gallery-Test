@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { searchPhotos, getAllPhotos } from '../services/api';
+import { searchPhotos, getAllPhotos, getAutoIndexingStatus, startAutoIndexing } from '../services/api';
 import { getPhotoImageURL } from '../utils/photoUtils';
 import AppHeader from '../components/AppHeader';
 import IndexingManager from '../components/IndexingManager';
@@ -38,12 +38,20 @@ export default function GalleryScreen({ navigation, route }: Props) {
   const [photos, setPhotos] = useState<any[]>([]);
   const [showIndexingManager, setShowIndexingManager] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [autoIndexingEnabled, setAutoIndexingEnabled] = useState(false);
 
   // Use React Query to automatically fetch photos
   const { data: allPhotosData, isLoading, error, refetch } = useQuery({
     queryKey: ['allPhotos'],
     queryFn: () => getAllPhotos(),
     retry: 1,
+  });
+
+  // Check auto-indexing status
+  const { data: autoIndexStatus } = useQuery({
+    queryKey: ['autoIndexStatus'],
+    queryFn: getAutoIndexingStatus,
+    refetchInterval: 5000, // Check every 5 seconds
   });
 
   const mutation = useMutation({
@@ -68,6 +76,12 @@ export default function GalleryScreen({ navigation, route }: Props) {
       setPhotos(mutation.data.results);
     }
   }, [mutation.data]);
+
+  useEffect(() => {
+    if (autoIndexStatus?.status) {
+      setAutoIndexingEnabled(autoIndexStatus.status.running);
+    }
+  }, [autoIndexStatus]);
 
   const handleIndexingComplete = (indexedPhotos: any[]) => {
     setPhotos(indexedPhotos);
@@ -94,6 +108,16 @@ export default function GalleryScreen({ navigation, route }: Props) {
       await refetch();
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleEnableAutoIndexing = async () => {
+    try {
+      await startAutoIndexing();
+      setAutoIndexingEnabled(true);
+      Alert.alert('Success', 'Auto-indexing enabled! New photos will be automatically processed.');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to enable auto-indexing');
     }
   };
 
@@ -162,16 +186,32 @@ export default function GalleryScreen({ navigation, route }: Props) {
               <Text style={styles.lastUpdated}>
                 Last updated: {new Date().toLocaleTimeString()}
               </Text>
+              <Text style={[styles.autoIndexStatus, { color: autoIndexingEnabled ? '#4CAF50' : '#FF9800' }]}>
+                Auto-indexing: {autoIndexingEnabled ? '✅ Enabled' : '⚠️ Disabled'}
+              </Text>
             </View>
-            <Button
-              mode="outlined"
-              onPress={handleLoadAllPhotos}
-              compact
-              style={styles.loadAllButton}
-              icon="refresh"
-            >
-              Refresh
-            </Button>
+            <View style={styles.headerButtons}>
+              <Button
+                mode="outlined"
+                onPress={handleLoadAllPhotos}
+                compact
+                style={styles.actionButton}
+                icon="refresh"
+              >
+                Refresh
+              </Button>
+              {!autoIndexingEnabled && (
+                <Button
+                  mode="contained"
+                  onPress={handleEnableAutoIndexing}
+                  compact
+                  style={styles.actionButton}
+                  icon="folder-sync"
+                >
+                  Enable Auto-Index
+                </Button>
+              )}
+            </View>
           </View>
           <FlatList
             data={photos}
@@ -268,6 +308,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 2,
+  },
+  autoIndexStatus: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    minWidth: 100,
   },
   loadAllButton: {
     minWidth: 100,
