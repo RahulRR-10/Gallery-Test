@@ -1,97 +1,148 @@
-# 📱 Smart Photo Gallery - AI-Powered On-Device Photo Management
+# 📱 Samsung Galaxy Style Photo Gallery - Complete AI-Powered System
 
-A modern React Native photo gallery application with advanced AI capabilities for face recognition, object detection, and intelligent search. All processing happens locally on your device for complete privacy.
+A fully-featured React Native photo gallery application with Samsung Galaxy UI styling and comprehensive AI capabilities. Features face recognition, object detection, semantic search, and automatic photo processing - all running locally for complete privacy.
 
-## 🌟 Key Features
+## 🌟 Complete Feature Set
 
-### � **Native Gallery Experience**
+### 📱 **Samsung Galaxy UI Experience**
+- **Native Gallery Design**: Dark theme matching Samsung Gallery aesthetic
+- **Bottom Tab Navigation**: Pictures, Albums, People, Menu tabs
+- **3-Column Photo Grid**: Mobile-optimized layout with proper spacing
+- **Full-Screen Photo Viewer**: Smooth photo viewing with navigation
+- **Refresh Control**: Pull-to-refresh functionality throughout
+- **Auto-Indexing UI**: Real-time indexing status and manual controls
 
-- **Timeline View**: Native-style photo grid with date sections
-- **High-Performance Scrolling**: Optimized FlatList with image caching
-- **Full-Screen Photo Viewer**: Smooth photo viewing experience
-- **Auto-Refresh**: Real-time updates when new photos are added
+### 🤖 **Advanced AI Processing**
+- **Face Detection**: InsightFace for high-accuracy face recognition
+- **Object Detection**: YOLOv8x/YOLOv10x for 80+ object categories
+- **Semantic Search**: OpenAI CLIP for natural language photo queries
+- **Fast Face Clustering**: Optimized DBSCAN clustering for performance
+- **Background Processing**: Non-blocking AI processing with task queue
+- **Auto-Indexing**: Watchdog file monitoring for automatic processing
 
-### 🤖 **AI-Powered Intelligence**
+### 👥 **People & Relationship Management**
+- **People Screen**: Browse all detected people with photo counts
+- **Person Profiles**: Individual person pages with their photos
+- **Face Clustering**: Automatic grouping of similar faces
+- **Relationship Discovery**: Co-occurrence analysis between people
+- **Groups Management**: Custom group creation and management
+- **Manual Labeling**: Add names and organize people
 
-- **Face Detection & Clustering**: Automatically group photos by people using InsightFace
-- **Object Recognition**: Detect 80+ object types with YOLOv8
-- **Semantic Search**: Natural language photo search using OpenAI CLIP
-- **Auto-Indexing**: Automatically process new photos with Watchdog monitoring
+### 🔍 **Comprehensive Search System**
+- **Search Screen**: Dedicated search interface with multiple modes
+- **Text Search**: Search by photo metadata and descriptions
+- **Semantic Search**: Natural language queries ("sunset on beach")
+- **People Search**: Find photos by detected people
+- **Object Search**: Search by detected objects and categories
+- **Date Range Search**: Filter photos by time periods
 
-### 👥 **People Management**
+### ⚙️ **Settings & Configuration**
+- **Settings Screen**: Complete configuration interface
+- **Processing Options**: Control AI processing preferences
+- **Storage Management**: Monitor database and cache usage
+- **Auto-Indexing Control**: Enable/disable automatic processing
+- **Performance Tuning**: Adjust processing parameters
 
-- **Face Clustering**: Group similar faces automatically with DBSCAN
-- **Person Labeling**: Name and organize people in your photos
-- **Relationship Discovery**: Find connections between people based on co-occurrence
-- **Group Management**: Create custom groups (family, friends, etc.)
-
-### 🔒 **Privacy-First Design**
-
-- **100% Local Processing**: All AI runs on-device, no cloud uploads
-- **SQLite Database**: Local storage for all photo metadata and embeddings
-- **No External Dependencies**: Complete offline functionality
-
-## 🏗️ Architecture
+## 🏗️ Complete System Architecture
 
 ```
-┌─────────────────┐    HTTP/REST API    ┌──────────────────┐
-│  React Native   │ ◄─────────────────► │   FastAPI        │
-│  Frontend       │                     │   Backend        │
-│                 │                     │                  │
-│ • Gallery View  │                     │ • Photo API      │
-│ • Search UI     │                     │ • Face Detection │
-│ • People Screen │                     │ • Auto-Indexing │
-│ • Photo Viewer  │                     │ • AI Processing  │
-└─────────────────┘                     └──────────────────┘
-                                                   │
-                                                   ▼
-                                        ┌──────────────────┐
-                                        │   SQLite DB      │
-                                        │                  │
-                                        │ • Photos         │
-                                        │ • Faces          │
-                                        │ • Clusters       │
-                                        │ • Embeddings     │
-                                        └──────────────────┘
+┌─────────────────────────────┐    REST API     ┌─────────────────────────────┐
+│     React Native App       │ ◄─────────────► │      FastAPI Backend       │
+│                             │                 │                             │
+│ Screens:                    │                 │ Core Services:              │
+│ • PicturesScreen (Gallery)  │                 │ • Photo API Endpoints       │
+│ • AlbumsScreen             │                 │ • Face Detection Service    │
+│ • PeopleScreen             │                 │ • Object Detection Service  │
+│ • SearchScreen             │                 │ • Semantic Search Engine    │
+│ • SettingsScreen           │                 │ • Auto-Indexing System     │
+│ • MenuScreen               │                 │ • Background Task Queue     │
+│ • PhotoViewer              │                 │ • Static File Serving      │
+│ • PersonScreen             │                 │                             │
+│ • GroupsScreen             │                 │ AI Models:                  │
+│ • RelationshipsScreen      │                 │ • InsightFace (Faces)       │
+│                             │                 │ • YOLOv8x/v10x (Objects)   │
+│ Components:                 │                 │ • OpenAI CLIP (Semantic)    │
+│ • PhotoGrid               │                 │ • DBSCAN (Clustering)      │
+│ • SearchBar               │                 │                             │
+│ • IndexingManager         │                 │ Database Layer:             │
+│ • TaskStatus              │                 │ • PhotoDatabase Class       │
+└─────────────────────────────┘                 │ • SQLite with Embeddings   │
+                                                │ • Face/Object Metadata     │
+                                                └─────────────────────────────┘
+                                                              │
+                                                              ▼
+                                                ┌─────────────────────────────┐
+                                                │        SQLite Database      │
+                                                │                             │
+                                                │ Tables:                     │
+                                                │ • photos (metadata, paths)  │
+                                                │ • faces (embeddings, bbox)  │
+                                                │ • face_clusters (groups)    │
+                                                │ • objects (detections)      │
+                                                │ • semantic_search (CLIP)    │
+                                                └─────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+## 📱 App Screens Overview
+
+### Core Navigation Tabs
+1. **Pictures Tab**: Main gallery with 3-column grid, timeline view, auto-indexing status
+2. **Albums Tab**: Organized photo collections and smart albums
+3. **People Tab**: Face detection results, person profiles, clustering management
+4. **Menu Tab**: Settings, tools, and additional features
+
+### Additional Screens
+- **PhotoViewer**: Full-screen photo viewing with metadata
+- **PersonScreen**: Individual person's photos and information
+- **SearchScreen**: Multi-modal search interface
+- **SettingsScreen**: App configuration and preferences
+- **GroupsScreen**: People group management
+- **RelationshipsScreen**: People relationship analysis
+- **StoriesScreen**: Photo story creation (placeholder)
+
+## 🚀 Quick Start Guide
 
 ### Prerequisites
-
 - **Node.js** 18+ and **npm**
-- **Python** 3.8+
+- **Python** 3.9+
 - **React Native** development environment
-- **Android Studio** (for Android) or **Xcode** (for iOS)
+- **Android Studio** (Android) or **Xcode** (iOS)
 
-### 1. Clone and Setup
-
+### 1. Project Setup
 ```bash
 git clone <your-repo-url>
 cd test_samsung
 ```
 
 ### 2. Backend Setup
-
 ```bash
 cd backend
 
-# Install Python dependencies
+# Install Python dependencies (includes YOLOv10 support)
 pip install -r requirements.txt
 
-# Start the API server
+# Create sample photos directory
+mkdir -p sample_photos
+
+# Start the FastAPI server with auto-indexing
 python -m uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-The backend will be available at `http://localhost:8000`
+The backend will be available at `http://localhost:8000` with:
+- Auto-indexing enabled on startup
+- Static file serving for photos
+- Background task processing
+- API documentation at `/docs`
 
 ### 3. Frontend Setup
-
 ```bash
 cd frontend
 
 # Install Node.js dependencies
 npm install
+
+# Update API configuration in src/config/api.ts
+# Set BASE_URL to your backend server (default: http://10.0.2.2:8000 for Android)
 
 # Start Metro bundler
 npm start
@@ -99,426 +150,196 @@ npm start
 # Run on Android (new terminal)
 npm run android
 
-# Or run on iOS (new terminal)
+# Or run on iOS
 npm run ios
 ```
 
-### 4. Configuration
-
-Update the backend IP address in `frontend/src/config/environment.ts`:
-
-```typescript
-const Config = {
-  development: {
-    localIP: "YOUR_COMPUTER_IP_ADDRESS", // e.g., "192.168.1.100"
-    localPort: 8000,
-  },
-};
-```
-
-## 📁 Project Structure
-
-```
-test_samsung/
-├── backend/                          # FastAPI Backend
-│   ├── api_server.py                 # Main API server
-│   ├── photo_database.py             # SQLite database operations
-│   ├── auto_photo_indexer.py         # Watchdog auto-indexing service
-│   ├── final_photo_search.py         # Core photo search functionality
-│   ├── advanced_face_detection.py    # InsightFace integration
-│   ├── fast_clustering.py            # Optimized face clustering
-│   ├── clip_model.py                 # CLIP semantic embeddings
-│   ├── temporal_search.py            # Time-based search parsing
-│   ├── relationship_mapping.py       # People relationship discovery
-│   ├── requirements.txt              # Python dependencies
-│   ├── sample_photos/                # Photo storage directory
-│   └── photos.db                     # SQLite database
-│
-├── frontend/                         # React Native Frontend
-│   ├── src/
-│   │   ├── screens/                  # Application screens
-│   │   │   ├── GalleryScreen.tsx     # Main photo timeline
-│   │   │   ├── SearchScreen.tsx      # Search interface
-│   │   │   ├── PeopleScreen.tsx      # Face clusters management
-│   │   │   ├── PhotoViewer.tsx       # Full-screen photo view
-│   │   │   ├── PersonScreen.tsx      # Individual person's photos
-│   │   │   ├── GroupsScreen.tsx      # People groups management
-│   │   │   ├── RelationshipsScreen.tsx # Relationship visualization
-│   │   │   └── SettingsScreen.tsx    # App settings
-│   │   ├── components/               # Reusable UI components
-│   │   │   ├── AppHeader.tsx         # Common header component
-│   │   │   ├── PhotoGrid.tsx         # Grid photo display
-│   │   │   ├── IndexingManager.tsx   # Indexing progress UI
-│   │   │   ├── TaskStatus.tsx        # Background task status
-│   │   │   └── SearchBar.tsx         # Search input component
-│   │   ├── services/
-│   │   │   └── api.ts                # Backend API communication
-│   │   ├── utils/
-│   │   │   └── photoUtils.ts         # Photo path utilities
-│   │   └── config/
-│   │       └── environment.ts        # Environment configuration
-│   ├── android/                      # Android build files
-│   ├── ios/                          # iOS build files
-│   ├── package.json                  # Node.js dependencies
-│   └── App.tsx                       # Root application component
-└── README.md                         # This file
-```
+### 4. Add Photos for Processing
+1. Place photos in `backend/sample_photos/` directory
+2. The auto-indexing system will automatically detect and process new photos
+3. Processing includes:
+   - Face detection and embedding generation
+   - Object detection and classification
+   - CLIP semantic embedding creation
+   - Metadata extraction (EXIF, location, date)
 
 ## 🔧 API Endpoints
 
-### Core Photo Operations
+### Photo Management
+- `GET /api/photos` - Get all photos (limit: 1000)
+- `GET /api/photos/{photo_id}` - Get specific photo details
+- `POST /api/photos/search` - Search photos with text/semantic queries
+- `GET /api/photos/{photo_id}/faces` - Get faces detected in photo
 
-- `GET /api/photos` - Get all indexed photos
-- `GET /api/photos/{id}` - Get specific photo details
-- `POST /api/search` - Search photos with natural language queries
-- `GET /api/stats` - Get database statistics
+### Face & People Management
+- `GET /api/faces` - Get all detected faces
+- `GET /api/faces/clusters` - Get face clustering results
+- `POST /api/faces/cluster` - Trigger face clustering
+- `GET /api/people` - Get people (face clusters) with photo counts
+- `PUT /api/faces/clusters/{cluster_id}` - Update person information
 
-### Indexing & Processing
+### Auto-Indexing System
+- `GET /api/auto-indexing/status` - Check auto-indexing status
+- `POST /api/auto-indexing/start` - Start auto-indexing service
+- `POST /api/auto-indexing/stop` - Stop auto-indexing service
+- `POST /api/index-photos` - Manually trigger photo indexing
 
-- `POST /api/index` - Start background photo indexing
-- `GET /api/tasks/{task_id}` - Check background task status
-- `GET /api/auto-index/status` - Auto-indexing service status
-- `POST /api/auto-index/start` - Start auto-indexing
-- `POST /api/auto-index/stop` - Stop auto-indexing
+### Background Tasks
+- `GET /api/tasks` - Get background task status
+- `POST /api/cluster-faces-background` - Start background face clustering
 
-### Face Recognition
+## 🤖 AI Model Configuration
 
-- `GET /api/faces/clusters` - Get all face clusters (people)
-- `POST /api/faces/cluster` - Start face clustering process
-- `POST /api/faces/clusters/{id}/label` - Label a person
+### Face Detection (InsightFace)
+- **Model**: Buffalo_l for high accuracy
+- **Features**: Face detection, embedding generation, age/gender estimation
+- **Performance**: ~100ms per face on CPU
 
-### Groups & Relationships
+### Object Detection (YOLO)
+- **Models**: YOLOv8x and YOLOv10x support
+- **Classes**: 80 COCO dataset categories
+- **Confidence**: 0.5 threshold for detections
+- **Performance**: ~500ms per image on CPU
 
-- `GET /api/groups` - Get people groups
-- `POST /api/groups` - Create new people group
-- `GET /api/relationships` - Get discovered relationships
-- `POST /api/relationships/build` - Build relationship mappings
+### Semantic Search (CLIP)
+- **Model**: OpenAI CLIP (ViT-B/32)
+- **Capability**: Natural language photo queries
+- **Languages**: English text queries
+- **Performance**: ~200ms per image on CPU
 
-### System
+## 🗂️ Project Structure
 
-- `GET /api/status` - API health check
-- `GET /images/{filename}` - Serve photo files
-
-## 🤖 AI Technology Stack
-
-### Face Recognition (InsightFace)
-
-- **Detection Model**: Buffalo_L for high-accuracy face detection
-- **Embedding Model**: Face recognition with 512-dimensional embeddings
-- **Clustering**: DBSCAN algorithm for automatic face grouping
-- **Performance**: On-device processing with optimized inference
-
-### Object Detection (YOLOv8x)
-
-- **Model**: YOLOv8x for comprehensive object recognition
-- **Classes**: 80+ object categories from COCO dataset
-- **Capabilities**: Real-time object detection and classification
-- **Integration**: Automatic object tagging during photo indexing
-
-### Semantic Search (OpenAI CLIP)
-
-- **Model**: LAION CLIP for natural language understanding
-- **Features**: Text-to-image semantic similarity matching
-- **Queries**: Support for descriptive search terms
-- **Performance**: Fast vector similarity search with embeddings
-
-### Auto-Indexing (Watchdog)
-
-- **Monitoring**: Real-time file system watching
-- **Processing**: Automatic photo detection and indexing
-- **Efficiency**: Debounced processing to handle file operations
-- **Coverage**: Recursive directory monitoring with file stability checks
-
-## 🗄️ Database Schema
-
-### Photos Table
-
-```sql
-CREATE TABLE photos (
-    id TEXT PRIMARY KEY,           -- SHA-256 hash of file
-    path TEXT NOT NULL,            -- File system path
-    timestamp INTEGER,             -- File creation timestamp
-    exif_timestamp INTEGER,        -- EXIF timestamp if available
-    objects TEXT,                  -- JSON array of detected objects
-    clip_embedding BLOB            -- CLIP semantic embedding
-);
+```
+test_samsung/
+├── backend/                 # FastAPI Python backend
+│   ├── api_server.py       # Main FastAPI application
+│   ├── photo_database.py   # SQLite database operations
+│   ├── final_photo_search.py # Search implementation
+│   ├── fast_clustering.py  # Optimized face clustering
+│   ├── requirements.txt    # Python dependencies
+│   ├── sample_photos/      # Photo storage directory
+│   └── photos.db          # SQLite database
+├── frontend/               # React Native app
+│   ├── src/
+│   │   ├── screens/       # All app screens
+│   │   │   ├── PicturesScreen.tsx
+│   │   │   ├── PeopleScreen.tsx
+│   │   │   ├── SearchScreen.tsx
+│   │   │   ├── SettingsScreen.tsx
+│   │   │   └── ... (other screens)
+│   │   ├── components/    # Reusable UI components
+│   │   ├── services/      # API client and utilities
+│   │   └── utils/         # Helper functions
+│   ├── App.tsx           # Main app component
+│   └── package.json      # Node.js dependencies
+└── README.md            # This file
 ```
 
-### Faces Table
+## 🎯 Key Features in Detail
 
-```sql
-CREATE TABLE faces (
-    face_id TEXT PRIMARY KEY,      -- Unique face identifier
-    photo_id TEXT,                 -- Reference to photos table
-    bbox TEXT,                     -- Face bounding box coordinates
-    embedding BLOB,                -- Face recognition embedding
-    cluster_id TEXT,               -- Assigned cluster/person ID
-    detection_method TEXT          -- Detection algorithm used
-);
-```
+### Auto-Indexing System
+- **File Monitoring**: Watchdog monitors `sample_photos/` directory
+- **Automatic Processing**: New photos are automatically processed on addition
+- **Background Tasks**: Non-blocking processing with task queue
+- **Status Monitoring**: Real-time indexing status in the app
+- **Manual Control**: Start/stop auto-indexing from settings
 
-### Face Clusters Table
+### Face Clustering Algorithm
+- **Detection**: InsightFace detects faces with bounding boxes
+- **Embedding**: 512-dimensional face embeddings generated
+- **Clustering**: DBSCAN algorithm groups similar faces
+- **Fast Processing**: Optimized clustering for large photo collections
+- **Manual Verification**: Review and correct clustering results
 
-```sql
-CREATE TABLE face_clusters (
-    cluster_id TEXT PRIMARY KEY,   -- Unique cluster identifier
-    label TEXT,                    -- Person name/label
-    num_faces INTEGER,             -- Number of faces in cluster
-    created_at TEXT                -- Cluster creation timestamp
-);
-```
+### Search Capabilities
+1. **Text Search**: Search photo filenames and metadata
+2. **Semantic Search**: Natural language queries using CLIP
+3. **Face Search**: Find photos containing specific people
+4. **Object Search**: Search by detected objects and categories
+5. **Combined Search**: Mix multiple search modes
 
-## 🎯 How to Use
+### Performance Optimizations
+- **React Query**: Caching and automatic refetching
+- **Image Caching**: Efficient image loading and memory management
+- **Virtualized Lists**: Smooth scrolling for large photo collections
+- **Background Processing**: Non-blocking AI operations
+- **SQLite Indexing**: Optimized database queries
 
-### First-Time Setup
+## 🛠️ Development & Customization
 
-1. **Start the Application**
+### Adding New AI Models
+1. Update `requirements.txt` with new model dependencies
+2. Implement model loading in appropriate service file
+3. Add API endpoints in `api_server.py`
+4. Update frontend to use new endpoints
 
-   - Launch backend: `python -m uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload`
-   - Launch frontend: `npm run android` or `npm run ios`
+### Customizing UI Theme
+- Modify theme colors in `frontend/App.tsx`
+- Update component styles in individual screen files
+- Customize icons and navigation in `App.tsx`
 
-2. **Add Photos**
+### Database Schema Extensions
+- Modify table schemas in `photo_database.py`
+- Add migration logic for existing databases
+- Update API endpoints to handle new fields
 
-   - Place photos in `backend/sample_photos/` directory
-   - Auto-indexing will automatically detect and process new photos
-   - Or use the "Gallery Setup" button in the app to manually index
+## 🔒 Privacy & Security
 
-3. **Enable Face Recognition**
-   - Go to "People" tab in the app
-   - Tap the clustering button (face icon) to start face detection
-   - Wait for processing to complete (progress shown in real-time)
+- **100% Local Processing**: All AI operations run on-device
+- **No Cloud Uploads**: Photos never leave your device
+- **SQLite Storage**: Local database with no external connections
+- **No Telemetry**: No usage data collection or tracking
+- **Offline Capable**: Full functionality without internet
 
-### Daily Usage
+## 📋 System Requirements
 
-#### Browse Photos
+### Minimum Requirements
+- **RAM**: 4GB (8GB+ recommended for large photo collections)
+- **Storage**: 2GB free space for models and database
+- **CPU**: Multi-core processor (ARM64 recommended)
+- **OS**: Android 7.0+ or iOS 12.0+
 
-- **Gallery Tab**: Scroll through your photos in timeline view
-- **Full-Screen Viewing**: Tap any photo to view in detail
-- **Auto-Refresh**: New photos appear automatically without restart
-
-#### Search Photos
-
-- **Search Tab**: Enter natural language queries
-- Examples:
-  - "dogs playing in the park"
-  - "birthday party with cake"
-  - "red flowers"
-  - "people smiling"
-
-#### Manage People
-
-- **People Tab**: View face clusters automatically created
-- **Label People**: Tap on face clusters to add names
-- **Person View**: See all photos of a specific person
-
-#### Organize Groups
-
-- **Groups Tab**: Create custom groups (family, friends, work)
-- **Add Members**: Select people to include in groups
-- **Group Photos**: View photos containing group members
-
-#### Discover Relationships
-
-- **Relationships Tab**: See automatically discovered connections
-- **Co-occurrence**: People who appear together frequently
-- **Relationship Strength**: Based on number of shared photos
-
-## � Development
-
-### Backend Development
-
-```bash
-cd backend
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run with auto-reload for development
-python -m uvicorn api_server:app --reload --host 0.0.0.0 --port 8000
-
-# Test individual components
-python final_photo_search.py --index sample_photos  # Index photos
-python final_photo_search.py --stats                # Show database stats
-python final_photo_search.py --search "red flower"  # Test search
-```
-
-### Frontend Development
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start Metro bundler with cache reset
-npm start -- --reset-cache
-
-# Development builds
-npm run android  # Android
-npm run ios      # iOS
-
-# Debug mode
-npm run android -- --mode debug
-```
-
-### Testing the API
-
-```bash
-# Health check
-curl http://localhost:8000/api/status
-
-# Get photos
-curl http://localhost:8000/api/photos
-
-# Search photos
-curl -X POST http://localhost:8000/api/search \
-     -H "Content-Type: application/json" \
-     -d '{"query": "dog", "limit": 5}'
-```
+### Development Requirements
+- **Node.js**: 18.0+
+- **Python**: 3.9+
+- **React Native CLI**: Latest version
+- **Android SDK**: API Level 21+
+- **Xcode**: 12.0+ (iOS development)
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
+1. **Photos not loading**: Check `sample_photos/` directory permissions
+2. **AI processing slow**: Reduce batch sizes in processing functions
+3. **Database errors**: Delete `photos.db` to reset (will lose metadata)
+4. **Face clustering issues**: Adjust DBSCAN parameters in clustering code
+5. **API connection failed**: Verify backend server is running and accessible
 
-#### Backend Won't Start
+### Performance Tuning
+- Adjust photo processing batch sizes
+- Modify face detection confidence thresholds
+- Update clustering algorithm parameters
+- Optimize image resizing and caching
 
-```bash
-# Check Python version (3.8+ required)
-python --version
+## 🤝 Contributing
 
-# Install missing dependencies
-pip install fastapi uvicorn
-
-# Check if port 8000 is already in use
-netstat -an | findstr :8000  # Windows
-lsof -i :8000                # macOS/Linux
-```
-
-#### Frontend Connection Issues
-
-- **Update IP Address**: Edit `frontend/src/config/environment.ts` with your computer's IP
-- **Check Network**: Ensure device and computer are on same network
-- **Firewall**: Make sure port 8000 is not blocked by firewall
-
-#### Face Detection Not Working
-
-```bash
-# Check if InsightFace models are downloaded
-# Models download automatically on first use to ~/.insightface/
-
-# Verify face detection manually
-cd backend
-python -c "from advanced_face_detection import AdvancedFaceDetector; detector = AdvancedFaceDetector(); print('Face detection working')"
-```
-
-#### Photos Not Loading
-
-- **Check Photo Directory**: Ensure photos are in `backend/sample_photos/`
-- **File Permissions**: Make sure backend can read photo files
-- **Supported Formats**: JPG, PNG, BMP, TIFF, WEBP are supported
-- **File Paths**: Avoid special characters in file names
-
-#### Auto-Indexing Issues
-
-```bash
-# Check auto-indexing status
-curl http://localhost:8000/api/auto-index/status
-
-# Restart auto-indexing
-curl -X POST http://localhost:8000/api/auto-index/stop
-curl -X POST http://localhost:8000/api/auto-index/start
-```
-
-#### React Native Build Issues
-
-```bash
-# Clear React Native caches
-cd frontend
-npm start -- --reset-cache
-
-# Clean Android build
-cd android
-./gradlew clean
-
-# Clean iOS build
-cd ios
-rm -rf build/
-```
-
-### Performance Tips
-
-#### Backend Optimization
-
-- **GPU Acceleration**: Install GPU versions of PyTorch if available
-- **Batch Processing**: Reduce batch sizes if running out of memory
-- **Database**: Use SSD storage for better SQLite performance
-
-#### Frontend Optimization
-
-- **Image Caching**: Images are cached automatically by React Native
-- **Memory Management**: Large photo collections may require pagination
-- **Network**: Use WiFi for faster image loading
-
-## 🚀 Deployment
-
-### Production Backend
-
-```bash
-# Install production ASGI server
-pip install gunicorn
-
-# Run with Gunicorn
-gunicorn api_server:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
-
-# Or run with Docker
-docker build -t smart-photo-gallery-backend .
-docker run -p 8000:8000 smart-photo-gallery-backend
-```
-
-### Production Frontend
-
-```bash
-# Build Android APK
-cd frontend/android
-./gradlew assembleRelease
-
-# Build iOS app
-cd frontend/ios
-xcodebuild -workspace frontend.xcworkspace -scheme frontend archive
-```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly on both platforms
+5. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
-- **[InsightFace](https://github.com/deepinsight/insightface)**: State-of-the-art face analysis toolkit
-- **[Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics)**: Advanced object detection framework
-- **[OpenAI CLIP](https://github.com/openai/CLIP)**: Vision-language model for semantic search
-- **[FastAPI](https://fastapi.tiangolo.com/)**: Modern Python web framework
-- **[React Native](https://reactnative.dev/)**: Cross-platform mobile development
-- **[Watchdog](https://github.com/gorakhargosh/watchdog)**: Python file system monitoring
-
-## 🔮 Future Enhancements
-
-### Planned Features
-
-- [ ] **Enhanced Relationship Detection**: Parent/child, sibling relationships using advanced ML
-- [ ] **Event Timeline**: Automatic event detection and timeline visualization
-- [ ] **Location Intelligence**: GPS-based photo clustering and location search
-- [ ] **Duplicate Detection**: Find and manage duplicate or similar photos
-- [ ] **Video Support**: Extend AI features to video files with frame analysis
-- [ ] **Advanced Search Filters**: Date ranges, location filters, object combinations
-
-### Technical Improvements
-
-- [ ] **Performance**: GPU acceleration for mobile AI inference
-- [ ] **Offline AI**: Optimized on-device models for better performance
-- [ ] **Cloud Sync**: Optional encrypted cloud backup with local-first approach
-- [ ] **Web Interface**: Browser-based photo management using React
-- [ ] **Real-time Processing**: Live photo analysis during camera capture
+- **InsightFace** for face recognition technology
+- **Ultralytics YOLO** for object detection
+- **OpenAI CLIP** for semantic search capabilities
+- **React Native** for cross-platform mobile development
+- **FastAPI** for high-performance backend API
 
 ---
 
-**Built with ❤️ for privacy-conscious photo management**
