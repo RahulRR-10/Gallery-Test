@@ -1,45 +1,113 @@
-# AI Photo Search System - Requirements
-# Updated for Stage 1 completion with upgraded models + FastAPI Backend
+# AI Photo Search System - Complete Requirements
+# Updated for comprehensive deployment with all AI models and dependencies
+# Supports YOLOv8x, YOLOv10x, InsightFace, CLIP, and all backend functionality
 
-# Core PyTorch ecosystem
-torch>=2.0.0
-torchvision>=0.15.0
+# ==================== CORE PYTHON ECOSYSTEM ====================
+# Core PyTorch ecosystem - Latest stable versions
+torch>=2.0.0,<2.5.0              # PyTorch deep learning framework
+torchvision>=0.15.0,<0.20.0      # Computer vision utilities for PyTorch
+torchaudio>=2.0.0,<2.5.0         # Audio processing (dependency of some models)
 
-# AI Models
-transformers>=4.30.0              # LAION CLIP model
-ultralytics>=8.0.0                # YOLOv8x object detection
+# ==================== AI MODELS & FRAMEWORKS ====================
+# CLIP Model for semantic search
+transformers>=4.30.0,<4.46.0     # Hugging Face transformers for CLIP model
+accelerate>=0.20.0                # Accelerated inference for transformers
 
-# Computer Vision
-opencv-python>=4.8.0              # Basic image processing
-Pillow>=10.0.0                    # Image loading and EXIF
+# YOLO Object Detection (Both YOLOv8 and YOLOv10 support)
+ultralytics>=8.0.0,<8.4.0        # YOLOv8x/YOLOv10x object detection framework
+supervision>=0.18.0              # Enhanced YOLO utilities and visualization
 
-# Advanced Face Detection (Stage 1 upgrades)
-insightface>=0.7.3                # State-of-the-art face detection
-onnxruntime>=1.15.0               # Model inference engine
-mtcnn>=0.1.1                      # Alternative face detection
-facenet-pytorch>=2.5.3            # PyTorch face recognition
+# Advanced Face Detection & Recognition
+insightface>=0.7.3,<0.8.0        # State-of-the-art face detection (Buffalo_L model)
+onnxruntime>=1.15.0,<1.19.0      # ONNX model inference engine
+mtcnn>=0.1.1,<0.2.0              # Multi-task CNN for face detection
+facenet-pytorch>=2.5.3,<2.6.0    # PyTorch implementation of FaceNet
+face-recognition>=1.3.0,<2.0.0   # Fallback face recognition library
+dlib>=19.24.0,<19.25.0           # Required by face-recognition (compiled wheels available)
 
-# Data Processing
-numpy>=1.24.0,<2.0.0              # Numerical operations (NumPy 1.x for compatibility)
-dateparser>=1.1.8                 # Temporal intelligence
+# ==================== COMPUTER VISION & IMAGE PROCESSING ====================
+opencv-python>=4.8.0,<4.11.0     # OpenCV for basic image processing
+opencv-contrib-python>=4.8.0,<4.11.0  # Extended OpenCV functionality
+Pillow>=10.0.0,<11.0.0           # PIL/Pillow for image loading and EXIF data
+imageio>=2.28.0                  # Additional image I/O support
+scikit-image>=0.20.0             # Scientific image processing utilities
 
-# Utilities
-matplotlib>=3.7.0                 # Optional visualization
-requests>=2.28.0                  # Model downloads
-scikit-learn>=1.3.0               # Clustering (DBSCAN) for Stage 2
-networkx>=3.1                     # Relationship graph for Stage 2
-watchdog>=3.0.0                   # File system monitoring for auto-indexing
+# ==================== DATA PROCESSING & ANALYSIS ====================
+numpy>=1.24.0,<2.0.0             # Numerical operations (NumPy 1.x for compatibility)
+pandas>=2.0.0,<2.3.0             # Data manipulation and analysis
+scikit-learn>=1.3.0,<1.6.0       # Machine learning utilities (DBSCAN clustering)
+scipy>=1.10.0,<1.15.0            # Scientific computing utilities
 
-# FastAPI Backend (NEW)
-fastapi>=0.104.0                  # Modern web framework
-uvicorn>=0.24.0                   # ASGI server
-python-multipart>=0.0.6           # File upload support
-pydantic>=2.4.0                   # Data validation
-python-jose[cryptography]>=3.3.0  # JWT tokens (optional for auth)
-httpx==0.28.1
-pytest==8.4.2
-# Version compatibility fixes
-ml-dtypes==0.2.0                  # Fix for ONNX compatibility
-onnx>=1.14.0,<1.15.0             # ONNX model format
-tensorflow>=2.13.0,<2.16.0       # TensorFlow compatibility with NumPy 1.x
-protobuf>=3.20.0,<5.0.0          # Protobuf compatibility
+# ==================== TEMPORAL & TEXT PROCESSING ====================
+dateparser>=1.1.8,<1.3.0         # Natural language date/time parsing
+python-dateutil>=2.8.0           # Enhanced date/time utilities
+regex>=2023.0.0                  # Advanced regular expressions
+
+# ==================== GRAPH & RELATIONSHIP ANALYSIS ====================
+networkx>=3.1,<4.0               # Graph theory and relationship mapping
+matplotlib>=3.7.0,<3.9.0         # Plotting and visualization (optional)
+seaborn>=0.12.0                  # Statistical data visualization (optional)
+
+# ==================== WEB FRAMEWORK & API ====================
+# FastAPI Backend Framework
+fastapi>=0.104.0,<0.112.0        # Modern Python web framework
+uvicorn[standard]>=0.24.0,<0.31.0 # ASGI server with extras
+python-multipart>=0.0.6,<0.0.10  # File upload support for FastAPI
+pydantic>=2.4.0,<2.9.0           # Data validation and settings management
+pydantic-settings>=2.0.0         # Settings management extension
+python-jose[cryptography]>=3.3.0,<4.0.0  # JWT token handling (optional auth)
+
+# ==================== HTTP & API CLIENTS ====================
+httpx>=0.24.0,<0.28.0            # Modern HTTP client
+requests>=2.28.0,<2.33.0         # HTTP library for model downloads
+aiofiles>=23.0.0                 # Async file operations
+aiohttp>=3.8.0,<3.11.0           # Async HTTP client/server
+
+# ==================== FILE SYSTEM & MONITORING ====================
+watchdog>=3.0.0,<4.1.0           # File system monitoring for auto-indexing
+pathlib2>=2.3.0; python_version<"3.4"  # Enhanced pathlib for older Python
+
+# ==================== TESTING & DEVELOPMENT ====================
+pytest>=7.4.0,<8.5.0             # Testing framework
+pytest-asyncio>=0.21.0           # Async testing support
+pytest-cov>=4.1.0                # Coverage reporting
+httpx>=0.24.0                    # HTTP testing client
+
+# ==================== VERSION COMPATIBILITY & FIXES ====================
+# Critical compatibility fixes for model interoperability
+ml-dtypes>=0.2.0,<0.5.0          # Machine learning data types compatibility
+onnx>=1.14.0,<1.17.0             # ONNX model format support
+protobuf>=3.20.0,<5.0.0          # Protocol buffers (TensorFlow/ONNX dependency)
+typing-extensions>=4.5.0         # Enhanced type hints for older Python versions
+
+# TensorFlow (optional, used by some InsightFace models)
+tensorflow>=2.13.0,<2.18.0; platform_machine!="arm64"  # TensorFlow (CPU, exclude ARM64)
+tensorflow-macos>=2.13.0,<2.18.0; platform_system=="Darwin" and platform_machine=="arm64"  # Apple Silicon
+
+# ==================== PERFORMANCE & OPTIMIZATION ====================
+# Memory and performance optimization
+psutil>=5.9.0                    # System and process utilities
+memory-profiler>=0.60.0          # Memory usage profiling (development)
+
+# ==================== MODEL DOWNLOADS & CACHING ====================
+# Automatic model download and caching utilities
+huggingface-hub>=0.16.0,<0.25.0  # Hugging Face model hub client
+gdown>=4.7.0                     # Google Drive downloads (for custom models)
+
+# =================== YOLO MODEL SPECIFICATIONS ===================
+# The following models will be automatically downloaded on first use:
+# - yolov8x.pt (68.2M parameters, ~136MB) - High accuracy general detection
+# - yolov10x.pt (Latest, improved accuracy) - Best accuracy when available
+# - InsightFace Buffalo_L (~400MB) - State-of-the-art face detection
+# - LAION CLIP (~350MB) - Semantic search capabilities
+#
+# Total model downloads: ~1GB on first setup
+# All models are cached locally after first download
+
+# =================== INSTALLATION NOTES ===================
+# For best performance:
+# 1. Install PyTorch with CUDA support if GPU available:
+#    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# 2. For face_recognition on Windows, ensure Visual Studio Build Tools are installed
+# 3. For Apple Silicon Macs, use conda for dlib: conda install -c conda-forge dlib
+# 4. Models auto-download to ~/.cache/ and ~/.insightface/ directories

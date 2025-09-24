@@ -7,21 +7,20 @@ import {
   Dimensions,
   Alert,
   StyleSheet,
-  SectionList,
-  Text as RNText,
+  RefreshControl,
 } from 'react-native';
-import { ActivityIndicator, Button, Text, FAB } from 'react-native-paper';
+import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { searchPhotos, getAllPhotos, API_BASE_URL } from '../services/api';
+import { searchPhotos, getAllPhotos } from '../services/api';
 import { getPhotoImageURL } from '../utils/photoUtils';
 import AppHeader from '../components/AppHeader';
-import PhotoGrid from '../components/PhotoGrid';
 import IndexingManager from '../components/IndexingManager';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-const numColumns = 4; // More photos per row like native gallery
+const numColumns = 3; // 3 photos per row like mobile gallery
 const { width } = Dimensions.get('window');
-const photoSize = (width - 8) / numColumns; // 2px gap between photos
+const spacing = 4; // Gap between photos
+const photoSize = (width - (spacing * (numColumns + 1))) / numColumns;
 
 type RootStackParamList = {
   Root: undefined;
@@ -29,75 +28,16 @@ type RootStackParamList = {
   Person: { cluster: any };
 };
 
-type RootTabParamList = {
-  Gallery: { initialQuery?: string | null } | undefined;
-  Search: undefined;
-  People: undefined;
-  Groups: undefined;
-  Relationships: undefined;
-  Settings: undefined;
-};
-
 type Props = NativeStackScreenProps<RootStackParamList, 'Root'> & {
   navigation: any; // Tab navigation
   route: any; // Tab route
-};
-
-interface PhotoSection {
-  title: string;
-  data: any[];
-}
-
-// Group photos by date
-const groupPhotosByDate = (photos: any[]): PhotoSection[] => {
-  if (!photos || photos.length === 0) return [];
-  
-  // Sort photos by timestamp (newest first)
-  const sortedPhotos = [...photos].sort((a, b) => {
-    const timestampA = a.exif_timestamp || a.timestamp || 0;
-    const timestampB = b.exif_timestamp || b.timestamp || 0;
-    return timestampB - timestampA;
-  });
-  
-  const groups: { [key: string]: any[] } = {};
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  sortedPhotos.forEach(photo => {
-    const timestamp = (photo.exif_timestamp || photo.timestamp || 0) * 1000;
-    const photoDate = new Date(timestamp);
-    
-    let dateKey: string;
-    
-    if (photoDate.toDateString() === today.toDateString()) {
-      dateKey = 'Today';
-    } else if (photoDate.toDateString() === yesterday.toDateString()) {
-      dateKey = 'Yesterday';
-    } else {
-      // Format as "Month Day, Year" or "Month Day" if same year
-      const isSameYear = photoDate.getFullYear() === today.getFullYear();
-      dateKey = photoDate.toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: isSameYear ? undefined : 'numeric'
-      });
-    }
-    
-    if (!groups[dateKey]) {
-      groups[dateKey] = [];
-    }
-    groups[dateKey].push(photo);
-  });
-  
-  return Object.entries(groups).map(([title, data]) => ({ title, data }));
 };
 
 export default function GalleryScreen({ navigation, route }: Props) {
   const initial = route.params?.initialQuery ?? null;
   const [photos, setPhotos] = useState<any[]>([]);
   const [showIndexingManager, setShowIndexingManager] = useState(false);
-  const [photoSections, setPhotoSections] = useState<PhotoSection[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Use React Query to automatically fetch photos
   const { data: allPhotosData, isLoading, error, refetch } = useQuery({
@@ -117,26 +57,20 @@ export default function GalleryScreen({ navigation, route }: Props) {
     } else if (allPhotosData?.results) {
       // Load all photos from React Query
       setPhotos((allPhotosData as any).results);
-      const sections = groupPhotosByDate((allPhotosData as any).results);
-      setPhotoSections(sections);
     } else if (error && !isLoading) {
       // Show indexing manager if no photos found
       setShowIndexingManager(true);
     }
-  }, [initial, allPhotosData, error, isLoading]);
+  }, [initial, allPhotosData, error, isLoading, mutation]);
 
   useEffect(() => {
     if (mutation.data?.results) {
       setPhotos(mutation.data.results);
-      const sections = groupPhotosByDate(mutation.data.results);
-      setPhotoSections(sections);
     }
   }, [mutation.data]);
 
   const handleIndexingComplete = (indexedPhotos: any[]) => {
     setPhotos(indexedPhotos);
-    const sections = groupPhotosByDate(indexedPhotos);
-    setPhotoSections(sections);
     setShowIndexingManager(false);
     refetch(); // Refresh the query
     Alert.alert(
@@ -145,20 +79,25 @@ export default function GalleryScreen({ navigation, route }: Props) {
     );
   };
 
-  const handleIndexingError = (error: string) => {
-    Alert.alert('Error', error);
+  const handleIndexingError = (indexingError: string) => {
+    Alert.alert('Error', indexingError);
     setShowIndexingManager(false);
-  };
-
-  const handleRefresh = () => {
-    refetch();
   };
 
   const handleLoadAllPhotos = () => {
     refetch();
   };
 
-  // Render individual photo item
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Render individual photo item with loading state
   const renderPhotoItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.photoItem}
@@ -166,6 +105,7 @@ export default function GalleryScreen({ navigation, route }: Props) {
         photoId: item.id, 
         photo: item 
       })}
+      activeOpacity={0.8}
     >
       <Image
         source={{ uri: getPhotoImageURL(item) }}
@@ -175,27 +115,9 @@ export default function GalleryScreen({ navigation, route }: Props) {
     </TouchableOpacity>
   );
 
-  // Render section with photos in grid
-  const renderSection = ({ item: section }: { item: PhotoSection }) => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{section.title}</Text>
-      </View>
-      <FlatList
-        data={section.data}
-        renderItem={renderPhotoItem}
-        numColumns={numColumns}
-        scrollEnabled={false}
-        contentContainerStyle={styles.photosGrid}
-        columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
-        keyExtractor={(item) => item.id}
-      />
-    </View>
-  );
-
   if (showIndexingManager) {
     return (
-      <View style={{ flex: 1 }}>
+      <View style={styles.container}>
         <AppHeader title="Gallery Setup" />
         <IndexingManager
           onIndexingComplete={handleIndexingComplete}
@@ -206,7 +128,7 @@ export default function GalleryScreen({ navigation, route }: Props) {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
       <AppHeader title="Gallery" />
 
       {photos.length === 0 && !isLoading && (
@@ -251,17 +173,32 @@ export default function GalleryScreen({ navigation, route }: Props) {
               Refresh
             </Button>
           </View>
-          <SectionList
-            sections={photoSections}
+          <FlatList
+            data={photos}
             renderItem={renderPhotoItem}
-            renderSectionHeader={({ section }) => (
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-              </View>
-            )}
+            numColumns={numColumns}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
-            stickySectionHeadersEnabled={true}
+            contentContainerStyle={styles.photosGrid}
+            columnWrapperStyle={numColumns > 1 ? styles.row : undefined}
+            getItemLayout={(data, index) => ({
+              length: photoSize + spacing,
+              offset: (photoSize + spacing) * Math.floor(index / numColumns),
+              index,
+            })}
+            initialNumToRender={15}
+            maxToRenderPerBatch={15}
+            windowSize={10}
+            removeClippedSubviews={true}
+            updateCellsBatchingPeriod={50}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#6200ee"
+                colors={['#6200ee']}
+              />
+            }
           />
         </>
       )}
@@ -270,6 +207,9 @@ export default function GalleryScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -348,18 +288,24 @@ const styles = StyleSheet.create({
     color: '#495057',
   },
   photosGrid: {
-    paddingHorizontal: 2,
+    paddingHorizontal: spacing / 2,
+    paddingVertical: spacing / 2,
   },
   row: {
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing / 2,
   },
   photoItem: {
     width: photoSize,
     height: photoSize,
-    margin: 1,
+    marginBottom: spacing,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: '#f5f5f5',
   },
   photoImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 4,
   },
 });
