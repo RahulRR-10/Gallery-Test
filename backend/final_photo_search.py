@@ -105,9 +105,18 @@ class UltimatePhotoSearcher:
         if HAS_YOLO:
             try:
                 print("🎯 Loading YOLO model...")
-                # Upgrade to YOLOv8x for much better accuracy (68M params vs 3M)
-                self.yolo_model = YOLO('yolov8x.pt')
-                print("✅ YOLO object detection ready! (YOLOv8x - High Accuracy)")
+                
+                # Try YOLOv10 first (better accuracy)
+                try:
+                    self.yolo_model = YOLO('yolov10x.pt')
+                    print("✅ YOLOv10x object detection ready! (Latest - Best Accuracy)")
+                except Exception as yolov10_error:
+                    print(f"⚠️ YOLOv10 not available: {yolov10_error}")
+                    print("🔄 Falling back to YOLOv8x...")
+                    # Fallback to YOLOv8x
+                    self.yolo_model = YOLO('yolov8x.pt')
+                    print("✅ YOLOv8x object detection ready! (High Accuracy)")
+                    
             except Exception as e:
                 print(f"⚠️ YOLO loading failed: {e}")
                 self.yolo_model = None
@@ -331,8 +340,7 @@ class UltimatePhotoSearcher:
         if self.yolo_model:
             objects_data = self._detect_objects(image_path)
             if objects_data:
-                object_names = [obj['class'] for obj in objects_data]
-                self._update_photo_objects(photo_id, object_names)
+                self._update_photo_objects(photo_id, objects_data)
         
         # Detect faces (advanced or fallback)
         if self.face_detector or self.face_cascade:
@@ -359,13 +367,29 @@ class UltimatePhotoSearcher:
         
         return "processed"
     
-    def _update_photo_objects(self, photo_id: str, objects: List[str]):
-        """Update objects for a photo"""
+    def _update_photo_objects(self, photo_id: str, objects: List[Dict]):
+        """Update objects for a photo with enhanced storage including confidence scores"""
         import sqlite3
-        objects_str = ','.join(objects)
+        import json
+        
+        # Store as JSON with confidence scores for better ranking and filtering
+        objects_data = []
+        for obj in objects:
+            objects_data.append({
+                'class': obj['class'],
+                'confidence': round(obj['confidence'], 3),
+                'bbox': obj['bbox']
+            })
+        
+        # Sort by confidence (highest first) and limit to top 10 objects per photo
+        objects_data.sort(key=lambda x: x['confidence'], reverse=True)
+        objects_data = objects_data[:10]
+        
+        objects_json = json.dumps(objects_data)
+        
         conn = sqlite3.connect(self.db.db_path)
         cursor = conn.cursor()
-        cursor.execute("UPDATE photos SET objects = ? WHERE id = ?", (objects_str, photo_id))
+        cursor.execute("UPDATE photos SET objects = ? WHERE id = ?", (objects_json, photo_id))
         conn.commit()
         conn.close()
     
@@ -393,7 +417,7 @@ class UltimatePhotoSearcher:
                 if result.boxes is not None:
                     for box in result.boxes:
                         confidence = float(box.conf.cpu().numpy()[0])
-                        if confidence > 0.5:  # Confidence threshold
+                        if confidence > 0.25:  # Lowered confidence threshold for more detections
                             class_id = int(box.cls.cpu().numpy()[0])
                             class_name = self.yolo_model.names[class_id]
                             bbox = box.xyxy.cpu().numpy()[0].tolist()  # [x1, y1, x2, y2]
@@ -1499,7 +1523,7 @@ def rebuild_relationships(db_path: str):
     db.build_relationships_from_photos()
     print("✅ Rebuilt relationships")
 
-def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query: Optional[str], limit: int, time_filter: Optional[str]):
+def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query: Optional[str], limit: int, time_filter: Optional[str], similarity_threshold: float = 0.7):
     db = searcher.db
     cluster = db.get_cluster_by_label(person_label)
     if not cluster:
@@ -1518,7 +1542,7 @@ def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query
         if not photo_ids:
             print(f"⚠️ No photos for '{person_label}' within time range")
             return []
-    # If no query, just print the files
+    # If no query, just print the files (person-only detection - existing behavior)
     if not query:
         # Retrieve paths
         all_embs = db.get_all_embeddings()
@@ -1549,7 +1573,9 @@ def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query
         if HAS_MATPLOTLIB and results:
             searcher._display_results(results[:limit], f"Person: {person_label}")
         return results[:limit]
-    # With a query, restrict similarity search to these photo_ids
+    
+    # With a query, restrict similarity search to these photo_ids (person+object detection - with relative thresholding)
+    print(f"📝 Extracted text embedding: '{query}' -> (1024,)")
     query_emb = searcher.clip_extractor.get_clip_text_embedding(query)
     all_embs = db.get_all_embeddings()
     filtered = [(pid, path, emb) for pid, path, emb in all_embs if pid in set(photo_ids)]
@@ -1563,9 +1589,27 @@ def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query
             'exif_date': info.get('exif_date') if info else None,
             'created_date': info.get('created_date') if info else None
         })
+    
+    if not similarities:
+        print(f"⚠️ No photos found for '{person_label}' containing '{query}'")
+        return []
+    
+    # Sort by similarity (highest first)
     similarities.sort(key=lambda x: x['similarity'], reverse=True)
+    
+    # Apply relative thresholding for person+object searches
+    top_score = similarities[0]['similarity']
+    min_threshold = top_score * similarity_threshold
+    
+    # Filter results based on relative threshold
+    filtered_results = [result for result in similarities if result['similarity'] >= min_threshold]
+    
+    print(f"✅ Found {len(filtered_results)} photos of {person_label} matching '{query}' (threshold: {min_threshold:.3f})")
+    
+    # Apply limit to filtered results
+    top_results = filtered_results[:limit]
+    
     # Attach target faces for visualization
-    top_results = similarities[:limit]
     for r in top_results:
         pid = None
         # find photo id by matching path
@@ -1586,9 +1630,12 @@ def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query
                     except Exception:
                         continue
         r['target_faces'] = target_faces
+    
+    # Display filtered results only
     for i, r in enumerate(top_results, 1):
-        print(f"\n{i}. 📸 {os.path.basename(r['path'])}")
+        print(f"{i}. 📸 {os.path.basename(r['path'])}")
         print(f"   🎯 Similarity: {r['similarity']:.3f}")
+    
     if HAS_MATPLOTLIB and top_results:
         searcher._display_results(top_results, f"Person: {person_label} | {query or ''}")
     return top_results

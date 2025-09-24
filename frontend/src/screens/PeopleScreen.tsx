@@ -3,6 +3,7 @@ import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import { ActivityIndicator, Button, FAB } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import { getFaceClusters, startFaceClustering, getTask } from '../services/api';
 import AppHeader from '../components/AppHeader';
 import FullscreenLoader from '../components/FullscreenLoader';
@@ -22,6 +23,14 @@ export default function PeopleScreen({ navigation }: any) {
 
   console.log('PeopleScreen render - clusters:', clusters);
   console.log('PeopleScreen render - isLoading:', isLoading);
+
+  // Refetch when screen comes into focus (e.g., when returning from PersonScreen)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('PeopleScreen focused - refetching data');
+      refetch();
+    }, [refetch])
+  );
 
   const onCluster = async () => {
     try {

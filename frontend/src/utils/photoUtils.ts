@@ -71,3 +71,78 @@ export const getPhotoDisplayPath = (photo: any): string => {
   
   return path;
 };
+
+/**
+ * Performance optimization utilities
+ */
+
+export interface PhotoSection {
+  title: string;
+  data: any[];
+}
+
+export const groupPhotosByDate = (photos: any[]): PhotoSection[] => {
+  const grouped: { [key: string]: any[] } = {};
+  
+  photos.forEach(photo => {
+    if (photo.timestamp) {
+      // Create date string for grouping
+      const date = new Date(photo.timestamp * 1000);
+      const dateKey = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(photo);
+    }
+  });
+  
+  // Convert to array and sort by date (newest first)
+  return Object.entries(grouped)
+    .map(([title, data]) => ({ title, data }))
+    .sort((a, b) => {
+      const dateA = new Date(a.data[0].timestamp * 1000);
+      const dateB = new Date(b.data[0].timestamp * 1000);
+      return dateB.getTime() - dateA.getTime();
+    });
+};
+
+export const formatPhotoTimestamp = (timestamp: number): string => {
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+// Debounce function for performance optimization
+export const debounce = (func: Function, wait: number) => {
+  let timeout: NodeJS.Timeout;
+  return function executedFunction(...args: any[]) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
+// Throttle function for scroll events
+export const throttle = (func: Function, limit: number) => {
+  let inThrottle: boolean;
+  return function(this: any, ...args: any[]) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+};

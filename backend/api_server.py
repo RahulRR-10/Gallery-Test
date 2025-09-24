@@ -54,6 +54,7 @@ app.add_middleware(
 db = None
 api_helpers = APIHelpers()
 photo_searcher = None
+lightweight_person_search = None
 temporal_parser = TemporalParser()
 
 def get_database():
@@ -64,20 +65,30 @@ def get_database():
     return db
 
 def get_photo_searcher():
-    """Get photo searcher instance with lazy initialization"""
+    """Get photo searcher instance with lazy initialization (heavy models)"""
     global photo_searcher
     if photo_searcher is None:
         photo_searcher = UltimatePhotoSearcher()
     return photo_searcher
 
+def get_lightweight_person_search():
+    """Get lightweight person search instance with lazy initialization (no models)"""
+    global lightweight_person_search
+    if lightweight_person_search is None:
+        from lightweight_person_search import LightweightPersonSearch
+        lightweight_person_search = LightweightPersonSearch()
+    return lightweight_person_search
+
 # Pydantic models for API requests/responses
 class SearchRequest(BaseModel):
-    query: Optional[str] = Field(None, description="Search query text")
-    person: Optional[str] = Field(None, description="Person name to search for")
-    group: Optional[str] = Field(None, description="Group name to search for")
-    relationship: Optional[str] = Field(None, description="Relationship type to search for")
-    time_filter: Optional[str] = Field(None, description="Time expression (e.g., 'last month')")
+    query: Optional[str] = Field(None, description="Intelligent multi-word search query (e.g., 'John birthday cake 2024')")
+    # Legacy fields for backward compatibility
+    person: Optional[str] = Field(None, description="[LEGACY] Person name to search for")
+    group: Optional[str] = Field(None, description="[LEGACY] Group name to search for")
+    relationship: Optional[str] = Field(None, description="[LEGACY] Relationship type to search for")
+    time_filter: Optional[str] = Field(None, description="[LEGACY] Time expression (e.g., 'last month')")
     limit: int = Field(10, description="Maximum number of results")
+    similarity_threshold: float = Field(0.7, description="Relative similarity threshold for person+object searches (0.0-1.0)")
 
 class IndexRequest(BaseModel):
     directory: str = Field(..., description="Directory path to index")
@@ -266,30 +277,182 @@ async def get_task_status(task_id: str):
 
 @app.post("/api/search")
 async def search_photos(request: SearchRequest):
-    """Search photos using various methods"""
+    """Search photos using intelligent multi-word parsing with optimized model loading"""
     try:
-        searcher = get_photo_searcher()
         results = []
+        search_method = "unknown"
         
-        # Parse time filter if provided
-        time_filter = None
-        if request.time_filter:
-            time_filter = temporal_parser.parse_time_expression(request.time_filter)
+        # Import intelligent query parser (lightweight - no models)
+        from intelligent_query_parser import IntelligentQueryParser
         
-        # For now, use the main search method from the searcher
-        # TODO: Implement specific search methods for person, group, relationship
+        # Use lightweight database-only parser first
+        db = get_database()
+        parser = IntelligentQueryParser(db.db_path)
         
-        if request.query:
-            # Use the main search_photos method
-            results = searcher.search_photos(
-                query=request.query,
-                limit=request.limit,
-                show_results=False,  # Don't show visual results in API
-                time_filter=request.time_filter
-            )
+        # Check if we have a direct query to parse intelligently
+        if request.query and not request.person and not request.group and not request.relationship:
+            # Use intelligent parsing for multi-word queries
+            parsed = parser.parse_query(request.query)
+            
+            # OPTIMIZATION: Person-only search (no models needed)
+            if parsed.person_labels and not parsed.object_terms:
+                # Use lightweight person search - no YOLO/CLIP loading!
+                lightweight_search = get_lightweight_person_search()
+                primary_person = parsed.person_labels[0]
+                
+                # Format time filter
+                time_filter_str = parser.format_time_filter(parsed.time_expressions)
+                if request.time_filter:  # Preserve original time filter if provided
+                    time_filter_str = request.time_filter
+                
+                results = lightweight_search.search_person_photos(
+                    person_label=primary_person,
+                    limit=request.limit,
+                    time_filter=time_filter_str
+                )
+                
+                search_method = "person_only_lightweight"
+                
+                if not results:
+                    return {
+                        "results": [],
+                        "total": 0,
+                        "query": request.query,
+                        "search_method": "person_not_found",
+                        "message": f"No photos found for person '{primary_person}'"
+                    }
+            
+            # Person + Object search (requires models)
+            elif parsed.person_labels and parsed.object_terms:
+                # Load heavy models only when needed
+                searcher = get_photo_searcher()
+                from final_photo_search import search_with_person
+                
+                primary_person = parsed.person_labels[0]
+                object_query = " ".join(parsed.object_terms)
+                
+                # Format time filter
+                time_filter_str = parser.format_time_filter(parsed.time_expressions)
+                if request.time_filter:
+                    time_filter_str = request.time_filter
+                
+                results = search_with_person(
+                    searcher=searcher,
+                    person_label=primary_person,
+                    query=object_query,
+                    limit=request.limit,
+                    time_filter=time_filter_str,
+                    similarity_threshold=request.similarity_threshold
+                )
+                
+                search_method = "person_object_heavy"
+                
+                if not results:
+                    return {
+                        "results": [],
+                        "total": 0,
+                        "query": request.query,
+                        "search_method": "person_object_no_results",
+                        "message": f"No photos found for '{primary_person}' with '{object_query}'"
+                    }
+            
+            
+            # Object-only search (requires models)
+            elif parsed.object_terms or parsed.time_expressions:
+                # Load heavy models only when needed
+                searcher = get_photo_searcher()
+                
+                search_query = " ".join(parsed.object_terms) if parsed.object_terms else request.query
+                time_filter_str = parser.format_time_filter(parsed.time_expressions)
+                if request.time_filter:  # Preserve original time filter if provided
+                    time_filter_str = request.time_filter
+                
+                results = searcher.search_photos(
+                    query=search_query,
+                    limit=request.limit,
+                    show_results=False,
+                    time_filter=time_filter_str
+                )
+                
+                search_method = "object_time_heavy" if parsed.time_expressions else "object_only_heavy"
+            
+            else:
+                # Fallback to regular semantic search (requires models)
+                searcher = get_photo_searcher()
+                results = searcher.search_photos(
+                    query=request.query,
+                    limit=request.limit,
+                    show_results=False,
+                    time_filter=request.time_filter
+                )
+                search_method = "semantic_fallback"
+        
+        # Handle legacy separate field searches (backward compatibility)
+        elif request.person:
+            # For legacy person field, use lightweight search if no object query
+            if not request.query:
+                # Pure person search - use lightweight
+                lightweight_searcher = get_lightweight_person_search()
+                results = lightweight_searcher.search_person_photos(
+                    person_labels=[request.person],
+                    limit=request.limit,
+                    time_filter=request.time_filter
+                )
+                search_method = "legacy_person_lightweight"
+            else:
+                # Person + object query - need heavy models
+                searcher = get_photo_searcher()
+                from final_photo_search import search_with_person
+                
+                results = search_with_person(
+                    searcher=searcher,
+                    person_label=request.person,
+                    query=request.query,
+                    limit=request.limit,
+                    time_filter=request.time_filter,
+                    similarity_threshold=request.similarity_threshold
+                )
+                search_method = "legacy_person_heavy"
+            
+            if not results:
+                return {
+                    "results": [],
+                    "total": 0,
+                    "query": request.query,
+                    "person": request.person,
+                    "search_method": "person_not_found",
+                    "message": f"No photos found for person '{request.person}'"
+                }
+        
+        elif request.query:
+            # For legacy query field, use intelligent parsing
+            from intelligent_query_parser import IntelligentQueryParser
+            parser = IntelligentQueryParser()
+            parsed = parser.parse_query(request.query)
+            
+            if parsed["persons"] and not parsed["objects"]:
+                # Person-only query - use lightweight
+                lightweight_searcher = get_lightweight_person_search()
+                results = lightweight_searcher.search_person_photos(
+                    person_labels=parsed["persons"],
+                    limit=request.limit,
+                    time_filter=request.time_filter
+                )
+                search_method = "legacy_auto_person_lightweight"
+            else:
+                # Need heavy models for object detection/CLIP
+                searcher = get_photo_searcher()
+                results = searcher.search_photos(
+                    query=request.query,
+                    limit=request.limit,
+                    show_results=False,
+                    time_filter=request.time_filter
+                )
+                search_method = "legacy_semantic_heavy"
         else:
             # Browse recent photos
             results = api_helpers.get_recent_photos(limit=request.limit)
+            search_method = "recent_browse"
         
         # Convert results to API format
         photo_responses = []
@@ -324,7 +487,8 @@ async def search_photos(request: SearchRequest):
             "results": photo_responses,
             "total": len(photo_responses),
             "query": request.query,
-            "search_method": _get_search_method(request)
+            "person": request.person,
+            "search_method": search_method
         }
         
     except Exception as e:
@@ -405,10 +569,14 @@ async def get_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/photos")
-async def get_all_photos(limit: int = Query(1000, description="Maximum number of photos to return")):
-    """Get all photos with optional limit"""
+async def get_all_photos(
+    limit: int = Query(20, description="Number of photos per page", ge=1, le=100),
+    offset: int = Query(0, description="Starting offset for pagination", ge=0)
+):
+    """Get all photos with pagination"""
     try:
-        photos = api_helpers.get_recent_photos(limit=limit)
+        photos = api_helpers.get_recent_photos(limit=limit, offset=offset)
+        total_count = api_helpers.get_photos_count()
         
         photo_responses = []
         for photo in photos:
@@ -416,18 +584,27 @@ async def get_all_photos(limit: int = Query(1000, description="Maximum number of
                 id=photo["id"],
                 filename=os.path.basename(photo["path"]),
                 path=photo["path"],
-                objects=photo.get("objects", []),  # Already parsed by helper method
+                objects=photo.get("objects", []),  # Already parsed and limited by helper method
                 timestamp=photo.get("timestamp"),
                 similarity_score=photo.get("similarity", 1.0),
                 faces=[],  # Don't load faces for bulk operations to improve performance
                 relationships=[]  # Don't load relationships for bulk operations
             ))
         
+        has_more = (offset + len(photos)) < total_count
+        
         return {
             "results": photo_responses,
             "total": len(photo_responses),
             "query": None,  # No query for get all photos
-            "search_method": "browse_all"
+            "search_method": "browse_all",
+            "pagination": {
+                "total": total_count,
+                "limit": limit,
+                "offset": offset,
+                "has_more": has_more,
+                "returned": len(photo_responses)
+            }
         }
         
     except Exception as e:
@@ -544,6 +721,13 @@ async def label_face_cluster(cluster_id: str, request: LabelRequest):
     api_helpers.label_face_cluster(cluster_id, request.name)
     return {"success": True}
 
+@app.post("/api/faces/label")
+async def label_face_cluster_simple(request: LabelPersonRequest):
+    """Label a person (face cluster) - Alternative endpoint for mobile app"""
+    # Update cluster label in database using cluster_id from request body
+    api_helpers.label_face_cluster(request.cluster_id, request.name)
+    return {"success": True}
+
 @app.get("/api/groups")
 async def list_groups():
     """List people groups (family, friends)"""
@@ -552,6 +736,12 @@ async def list_groups():
 @app.post("/api/groups")
 async def create_group(request: GroupRequest):
     """Create new people group"""
+    api_helpers.create_group(request.group_name, request.cluster_ids)
+    return {"success": True}
+
+@app.post("/api/groups/create")
+async def create_group_alternative(request: GroupRequest):
+    """Create new people group - Alternative endpoint for mobile app"""
     api_helpers.create_group(request.group_name, request.cluster_ids)
     return {"success": True}
 

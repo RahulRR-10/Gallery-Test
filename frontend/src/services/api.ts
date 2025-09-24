@@ -21,14 +21,24 @@ export const searchPhotos = async (payload: {
 }) => (await api.post('/search', payload)).data;
 
 export const getPhoto = async (id: number) => (await api.get(`/photos/${id}`)).data;
-export const getAllPhotos = async (limit = 10000) => {
+export const getAllPhotos = async (limit = 20, offset = 0) => {
   try {
-    console.log(`Fetching all photos with limit: ${limit}`);
-    const response = await api.get(`/photos?limit=${limit}`);
+    console.log(`Fetching photos with limit: ${limit}, offset: ${offset}`);
+    const response = await api.get(`/photos?limit=${limit}&offset=${offset}`);
     console.log('getAllPhotos response:', response.data);
     return response.data;
   } catch (error) {
     console.error('getAllPhotos error:', error);
+    throw error;
+  }
+};
+
+export const getPhotosBatch = async (limit = 20, offset = 0) => {
+  try {
+    const response = await api.get(`/photos?limit=${limit}&offset=${offset}`);
+    return response.data;
+  } catch (error) {
+    console.error('getPhotosBatch error:', error);
     throw error;
   }
 };

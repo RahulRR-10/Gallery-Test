@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import { List, ActivityIndicator, Chip } from 'react-native-paper';
+import { List, ActivityIndicator } from 'react-native-paper';
 import { useMutation } from '@tanstack/react-query';
 import { searchPhotos } from '../services/api';
 import { getPhotoFilename, getPhotoDisplayPath } from '../utils/photoUtils';
@@ -30,26 +30,55 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Root'> & {
 
 export default function SearchScreen({ navigation }: Props) {
   const [query, setQuery] = useState('');
-  const [timeFilter, setTimeFilter] = useState('');
-  const [person, setPerson] = useState('');
-  const [group, setGroup] = useState('');
-  const [relationship, setRelationship] = useState('');
 
   const mutation = useMutation({
     mutationFn: (payload: any) => searchPhotos(payload),
+    onSuccess: (data) => {
+      console.log('🔍 Search Results:', {
+        query: data.query,
+        search_method: data.search_method,
+        total_results: data.results?.length || 0,
+        parsed_components: data.parsed_components || 'legacy',
+        sample_results: data.results?.slice(0, 2) // First 2 results for debugging
+      });
+    },
+    onError: (error) => {
+      console.error('❌ Search failed:', error);
+    },
   });
 
-  const onSearch = () =>
-    mutation.mutate({
-      query: query || null,
-      person: person || null,
-      group: group || null,
-      relationship: relationship || null,
-      time_filter: timeFilter || null,
+  const onSearch = () => {
+    if (!query.trim()) {
+      return;
+    }
+
+    const searchPayload = {
+      query: query.trim(),
       limit: 30,
-    });
+      similarity_threshold: 0.7,
+    };
+    
+    console.log('🧠 Intelligent search payload:', searchPayload);
+    mutation.mutate(searchPayload);
+  };
 
   const results = mutation.data?.results || [];
+  const searchMethod = mutation.data?.search_method || '';
+  const message = mutation.data?.message || '';
+
+  // Create a readable search method description
+  const getSearchMethodDescription = (method: string) => {
+    switch (method) {
+      case 'person_only': return 'Person search';
+      case 'person_object': return 'Person + Object search';
+      case 'object_only': return 'Object search';
+      case 'object_time': return 'Object + Time search';
+      case 'semantic': return 'Semantic search';
+      case 'auto_person_detection': return 'Auto-detected person';
+      case 'recent_browse': return 'Recent photos';
+      default: return method || 'Smart search';
+    }
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -62,52 +91,41 @@ export default function SearchScreen({ navigation }: Props) {
       <SearchBar
         query={query}
         onQueryChange={setQuery}
-        timeFilter={timeFilter}
-        onTimeFilterChange={setTimeFilter}
-        person={person}
-        onPersonChange={setPerson}
-        group={group}
-        onGroupChange={setGroup}
-        relationship={relationship}
-        onRelationshipChange={setRelationship}
         onSearch={onSearch}
+        isLoading={mutation.isPending}
       />
-      <List.Section>
-        <List.Subheader>Quick filters</List.Subheader>
-        <View style={{ paddingHorizontal: 12 }}>
-          <Chip
-            icon="calendar"
-            mode="outlined"
-            style={{ marginVertical: 6 }}
-            onPress={() => setTimeFilter('today')}
-          >
-            Today
-          </Chip>
-          <Chip
-            icon="calendar-week"
-            mode="outlined"
-            style={{ marginVertical: 6 }}
-            onPress={() => setTimeFilter('last week')}
-          >
-            Last week
-          </Chip>
-          <Chip
-            icon="calendar-month"
-            mode="outlined"
-            style={{ marginVertical: 6 }}
-            onPress={() => setTimeFilter('last month')}
-          >
-            Last month
-          </Chip>
-        </View>
-      </List.Section>
-      {mutation.isLoading && <ActivityIndicator style={{ marginTop: 16 }} />}
+      {mutation.isPending && <ActivityIndicator style={{ marginTop: 16 }} />}
+      
+      {mutation.error && (
+        <List.Item
+          title="Search Error"
+          description={`Error: ${mutation.error.message}`}
+          left={props => <List.Icon {...props} icon="alert" />}
+        />
+      )}
+      
+      {mutation.data && (
+        <List.Subheader>
+          Found {results.length} photos{' '}
+          {mutation.data.search_method && `(${getSearchMethodDescription(mutation.data.search_method)})`}
+          {mutation.data.message && results.length === 0 && ` - ${mutation.data.message}`}
+        </List.Subheader>
+      )}
+      
+      {mutation.data && results.length === 0 && mutation.data.message && (
+        <List.Item
+          title="No Photos Found"
+          description={mutation.data.message}
+          left={props => <List.Icon {...props} icon="information" />}
+        />
+      )}
+      
       <List.Section>
         {results.map((p: any) => (
           <List.Item
             key={p.id}
             title={getPhotoFilename(p)}
-            description={getPhotoDisplayPath(p)}
+            description={`${getPhotoDisplayPath(p)} • ${p.similarity_score ? (p.similarity_score * 100).toFixed(0) + '%' : 'Exact match'}`}
             onPress={() =>
               navigation.navigate('PhotoViewer', { photoId: p.id, photo: p })
             }

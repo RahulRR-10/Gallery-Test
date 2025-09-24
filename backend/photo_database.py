@@ -333,7 +333,10 @@ class PhotoDatabase:
                 embedding = self.deserialize_embedding(embedding_blob)
                 results.append((photo_id, path, embedding))
             
-            print(f"📊 Retrieved {len(results)} photo embeddings")
+            # Only log at debug level to reduce console spam
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"📊 Retrieved {len(results)} photo embeddings")
             return results
             
         except Exception as e:
@@ -1077,6 +1080,171 @@ class PhotoDatabase:
                 
         except Exception as e:
             print(f"❌ Error deleting group: {e}")
+            return False
+
+    def get_cluster_by_label(self, label: str) -> Optional[dict]:
+        """
+        Get cluster information by label
+        
+        Args:
+            label: The label to search for
+            
+        Returns:
+            Dictionary with cluster information or None if not found
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT cluster_id, label, num_faces, updated_at
+                FROM face_clusters 
+                WHERE label = ?
+            ''', (label,))
+            
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                return {
+                    'cluster_id': result[0],
+                    'label': result[1],
+                    'num_faces': result[2],
+                    'updated_at': result[3]
+                }
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error getting cluster by label: {e}")
+            return None
+
+    def get_clusters(self) -> List[dict]:
+        """
+        Get all face clusters
+        
+        Returns:
+            List of cluster dictionaries
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT cluster_id, label, num_faces, updated_at
+                FROM face_clusters 
+                ORDER BY num_faces DESC
+            ''')
+            
+            clusters = []
+            for row in cursor.fetchall():
+                clusters.append({
+                    'cluster_id': row[0],
+                    'label': row[1],
+                    'num_faces': row[2],
+                    'updated_at': row[3]
+                })
+            
+            conn.close()
+            return clusters
+            
+        except Exception as e:
+            print(f"❌ Error getting clusters: {e}")
+            return []
+
+    def get_photos_with_clusters(self, cluster_ids: List[str]) -> List[str]:
+        """
+        Get photo IDs that contain faces from specific clusters
+        
+        Args:
+            cluster_ids: List of cluster IDs to search for
+            
+        Returns:
+            List of photo IDs
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Create placeholder string for IN clause
+            placeholders = ','.join(['?' for _ in cluster_ids])
+            
+            cursor.execute(f'''
+                SELECT DISTINCT photo_id
+                FROM faces 
+                WHERE cluster_id IN ({placeholders})
+            ''', cluster_ids)
+            
+            photo_ids = [row[0] for row in cursor.fetchall()]
+            conn.close()
+            return photo_ids
+            
+        except Exception as e:
+            print(f"❌ Error getting photos with clusters: {e}")
+            return []
+
+    def get_faces_by_photo(self, photo_id: str) -> List[dict]:
+        """
+        Get all faces in a photo
+        
+        Args:
+            photo_id: ID of the photo
+            
+        Returns:
+            List of face dictionaries
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT id, bbox, cluster_id, method
+                FROM faces 
+                WHERE photo_id = ?
+            ''', (photo_id,))
+            
+            faces = []
+            for row in cursor.fetchall():
+                faces.append({
+                    'id': row[0],
+                    'bbox': row[1],
+                    'cluster_id': row[2],
+                    'method': row[3]
+                })
+            
+            conn.close()
+            return faces
+            
+        except Exception as e:
+            print(f"❌ Error getting faces by photo: {e}")
+            return []
+
+    def label_cluster(self, cluster_id: str, label: str) -> bool:
+        """
+        Label a face cluster
+        
+        Args:
+            cluster_id: ID of the cluster to label
+            label: Label to assign
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            updated_at = datetime.now().isoformat()
+            cursor.execute('''
+                INSERT OR REPLACE INTO face_clusters (cluster_id, label, updated_at)
+                VALUES (?, ?, ?)
+            ''', (cluster_id, label, updated_at))
+            
+            conn.commit()
+            conn.close()
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error labeling cluster: {e}")
             return False
 
 

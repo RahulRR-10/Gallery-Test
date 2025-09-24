@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, TextInput, Button } from 'react-native-paper';
+import { useQueryClient } from '@tanstack/react-query';
 import { labelFaceCluster } from '../services/api';
 import { getPhotoImageURL } from '../utils/photoUtils';
 import AppHeader from '../components/AppHeader';
@@ -10,20 +11,35 @@ import { API_BASE_URL, getPhoto } from '../services/api';
 export default function PersonScreen({ navigation, route }: any) {
   const { cluster } = route.params;
   const [name, setName] = useState('');
+  const [isLabeling, setIsLabeling] = useState(false);
+  const queryClient = useQueryClient();
 
   const onLabel = async () => {
-    if (!name) return;
+    if (!name.trim()) return;
+    
+    setIsLabeling(true);
     try {
-      await labelFaceCluster(cluster.cluster_id, name);
+      await labelFaceCluster(cluster.cluster_id, name.trim());
+      
+      // Invalidate the clusters cache to refresh PeopleScreen
+      queryClient.invalidateQueries({ queryKey: ['clusters'] });
+      
       // Update the local state to reflect the change
       navigation.setParams({
         cluster: {
           ...cluster,
-          label: name,
+          label: name.trim(),
         },
       });
+      
+      // Clear the input field after successful labeling
+      setName('');
+      
+      console.log(`Successfully labeled ${cluster.cluster_id} as "${name.trim()}"`);
     } catch (error) {
       console.error('Error labeling cluster:', error);
+    } finally {
+      setIsLabeling(false);
     }
   };
 
@@ -69,20 +85,30 @@ export default function PersonScreen({ navigation, route }: any) {
 
   return (
     <View style={styles.container}>
-      <AppHeader title={cluster.label || cluster.cluster_id || 'Person'} />
+      <AppHeader title={cluster.label || `Cluster ${cluster.cluster_id}` || 'Person'} />
 
       <View style={styles.headerContainer}>
         <Text style={styles.photoCount}>Photos: {cluster.photo_count}</Text>
+        {cluster.label && (
+          <Text style={styles.currentLabel}>Current label: {cluster.label}</Text>
+        )}
         <View style={styles.labelContainer}>
           <TextInput
             mode="outlined"
-            label="Label person"
+            label={cluster.label ? "Update person name" : "Label person"}
             value={name}
             onChangeText={setName}
             style={styles.input}
+            disabled={isLabeling}
           />
-          <Button mode="contained" onPress={onLabel} style={styles.button}>
-            Save Label
+          <Button 
+            mode="contained" 
+            onPress={onLabel} 
+            style={styles.button}
+            loading={isLabeling}
+            disabled={isLabeling || !name.trim()}
+          >
+            {isLabeling ? 'Saving...' : (cluster.label ? 'Update' : 'Save Label')}
           </Button>
         </View>
       </View>
@@ -113,6 +139,12 @@ const styles = StyleSheet.create({
   photoCount: {
     fontSize: 16,
     marginBottom: 8,
+  },
+  currentLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   labelContainer: {
     flexDirection: 'row',

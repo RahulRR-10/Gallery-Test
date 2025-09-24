@@ -232,32 +232,43 @@ class APIHelpers:
             logger.error(f"Error getting stats: {e}")
             return {"photos": 0, "faces": 0, "clusters": 0, "relationships": 0, "groups": 0}
     
-    def get_recent_photos(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get recent photos for browsing"""
+    def get_recent_photos(self, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        """Get recent photos for browsing with pagination support"""
         try:
             with self.get_db_connection() as conn:
                 cursor = conn.cursor()
                 
+                # Use efficient pagination with LIMIT and OFFSET
                 cursor.execute("""
                     SELECT id, path, timestamp, objects
                     FROM photos 
                     ORDER BY timestamp DESC, id DESC
-                    LIMIT ?
-                """, (limit,))
+                    LIMIT ? OFFSET ?
+                """, (limit, offset))
                 
                 photos = []
                 for row in cursor.fetchall():
-                    # Safely parse objects (comma-separated string, not JSON)
+                    # Efficiently handle objects (delay parsing if heavy)
                     objects = []
                     if row[3]:  # If objects field is not None or empty
-                        # Parse as comma-separated string
-                        objects = [obj.strip() for obj in row[3].split(",") if obj.strip()]
+                        try:
+                            # Check if it's JSON format (new) or comma-separated (old)
+                            if row[3].startswith('['):
+                                import json
+                                objects_data = json.loads(row[3])
+                                objects = [obj['class'] for obj in objects_data if isinstance(obj, dict)]
+                            else:
+                                # Parse as comma-separated string
+                                objects = [obj.strip() for obj in row[3].split(",") if obj.strip()]
+                        except (json.JSONDecodeError, AttributeError):
+                            # Fallback to comma-separated parsing
+                            objects = [obj.strip() for obj in str(row[3]).split(",") if obj.strip()]
                     
                     photo = {
                         "id": row[0],  # Keep as string (hash)
                         "path": row[1],
                         "timestamp": row[2],  # Keep as integer
-                        "objects": objects,
+                        "objects": objects[:5],  # Limit to first 5 objects for performance
                         "similarity": 1.0  # Default for browsing
                     }
                     photos.append(photo)
@@ -267,6 +278,17 @@ class APIHelpers:
         except Exception as e:
             logger.error(f"Error getting recent photos: {e}")
             return []
+    
+    def get_photos_count(self) -> int:
+        """Get total number of photos in database"""
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM photos")
+                return cursor.fetchone()[0]
+        except Exception as e:
+            logger.error(f"Error getting photos count: {e}")
+            return 0
     
     def search_photos_simple(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Simple text search in photo metadata"""
