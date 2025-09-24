@@ -308,39 +308,62 @@ async def search_photos(request: SearchRequest):
             
             # OPTIMIZATION: Person-only search (no models needed)
             if parsed.person_labels and not parsed.object_terms:
-                # Use lightweight person search - no YOLO/CLIP loading!
-                lightweight_search = get_lightweight_person_search()
-                primary_person = parsed.person_labels[0]
-                
                 # Format time filter
                 time_filter_str = parser.format_time_filter(parsed.time_expressions)
                 if request.time_filter:  # Preserve original time filter if provided
                     time_filter_str = request.time_filter
                 
-                results = lightweight_search.search_person_photos(
-                    person_label=primary_person,
-                    limit=request.limit,
-                    time_filter=time_filter_str
-                )
-                
-                search_method = "person_only_lightweight"
-                
-                if not results:
-                    return {
-                        "results": [],
-                        "total": 0,
-                        "query": request.query,
-                        "search_method": "person_not_found",
-                        "message": f"No photos found for person '{primary_person}'"
-                    }
+                # Handle multiple people search
+                if len(parsed.person_labels) > 1:
+                    # Multiple people - need to use heavy search for intersection
+                    searcher = get_photo_searcher()
+                    from final_photo_search import search_with_multiple_people
+                    
+                    results = search_with_multiple_people(
+                        searcher=searcher,
+                        person_labels=parsed.person_labels,
+                        query=None,  # No additional query
+                        limit=request.limit,
+                        time_filter=time_filter_str,
+                        show_visual=False
+                    )
+                    
+                    search_method = "multiple_people_intersection"
+                    
+                    if not results:
+                        return {
+                            "results": [],
+                            "total": 0,
+                            "query": request.query,
+                            "search_method": "multiple_people_not_found",
+                            "message": f"No photos found containing all people: {', '.join(parsed.person_labels)}"
+                        }
+                else:
+                    # Single person - use lightweight person search - no YOLO/CLIP loading!
+                    lightweight_search = get_lightweight_person_search()
+                    primary_person = parsed.person_labels[0]
+                    
+                    results = lightweight_search.search_person_photos(
+                        person_label=primary_person,
+                        limit=request.limit,
+                        time_filter=time_filter_str
+                    )
+                    
+                    search_method = "person_only_lightweight"
+                    
+                    if not results:
+                        return {
+                            "results": [],
+                            "total": 0,
+                            "query": request.query,
+                            "search_method": "person_not_found",
+                            "message": f"No photos found for person '{primary_person}'"
+                        }
             
             # Person + Object search (requires models)
             elif parsed.person_labels and parsed.object_terms:
                 # Load heavy models only when needed
                 searcher = get_photo_searcher()
-                from final_photo_search import search_with_person
-                
-                primary_person = parsed.person_labels[0]
                 object_query = " ".join(parsed.object_terms)
                 
                 # Format time filter
@@ -348,26 +371,55 @@ async def search_photos(request: SearchRequest):
                 if request.time_filter:
                     time_filter_str = request.time_filter
                 
-                results = search_with_person(
-                    searcher=searcher,
-                    person_label=primary_person,
-                    query=object_query,
-                    limit=request.limit,
-                    time_filter=time_filter_str,
-                    similarity_threshold=request.similarity_threshold,
-                    show_visual=False
-                )
-                
-                search_method = "person_object_heavy"
-                
-                if not results:
-                    return {
-                        "results": [],
-                        "total": 0,
-                        "query": request.query,
-                        "search_method": "person_object_no_results",
-                        "message": f"No photos found for '{primary_person}' with '{object_query}'"
-                    }
+                if len(parsed.person_labels) > 1:
+                    # Multiple people + objects - use multiple people search with object query
+                    from final_photo_search import search_with_multiple_people
+                    
+                    results = search_with_multiple_people(
+                        searcher=searcher,
+                        person_labels=parsed.person_labels,
+                        query=object_query,  # Include object search
+                        limit=request.limit,
+                        time_filter=time_filter_str,
+                        show_visual=False
+                    )
+                    
+                    search_method = "multiple_people_object_heavy"
+                    
+                    if not results:
+                        return {
+                            "results": [],
+                            "total": 0,
+                            "query": request.query,
+                            "search_method": "multiple_people_object_no_results",
+                            "message": f"No photos found for all people ({', '.join(parsed.person_labels)}) with '{object_query}'"
+                        }
+                else:
+                    # Single person + objects
+                    from final_photo_search import search_with_person
+                    
+                    primary_person = parsed.person_labels[0]
+                    
+                    results = search_with_person(
+                        searcher=searcher,
+                        person_label=primary_person,
+                        query=object_query,
+                        limit=request.limit,
+                        time_filter=time_filter_str,
+                        similarity_threshold=request.similarity_threshold,
+                        show_visual=False
+                    )
+                    
+                    search_method = "person_object_heavy"
+                    
+                    if not results:
+                        return {
+                            "results": [],
+                            "total": 0,
+                            "query": request.query,
+                            "search_method": "person_object_no_results",
+                            "message": f"No photos found for '{primary_person}' with '{object_query}'"
+                        }
             
             
             # Object-only search - try fast object search first
