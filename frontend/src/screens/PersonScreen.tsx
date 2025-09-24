@@ -85,7 +85,7 @@ export default function PersonScreen({ navigation, route }: any) {
 
   return (
     <View style={styles.container}>
-      <AppHeader title={cluster.label || `Cluster ${cluster.cluster_id}` || 'Person'} />
+      <AppHeader title={cluster.label || 'Person'} />
 
       <View style={styles.headerContainer}>
         <Text style={styles.photoCount}>Photos: {cluster.photo_count}</Text>
@@ -100,6 +100,16 @@ export default function PersonScreen({ navigation, route }: any) {
             onChangeText={setName}
             style={styles.input}
             disabled={isLabeling}
+            theme={{
+              colors: {
+                background: '#FFFFFF',
+                text: '#000000',
+                placeholder: '#666666',
+                primary: '#4285F4',
+                outline: '#CCCCCC',
+              }
+            }}
+            textColor="#000000"
           />
           <Button 
             mode="contained" 
@@ -121,7 +131,7 @@ export default function PersonScreen({ navigation, route }: any) {
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <Text>No photos found in this cluster</Text>
+          <Text style={styles.emptyText}>No photos found in this cluster</Text>
         </View>
       )}
     </View>
@@ -131,18 +141,20 @@ export default function PersonScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#000000',
   },
   headerContainer: {
     padding: 12,
+    backgroundColor: '#000000',
   },
   photoCount: {
     fontSize: 16,
     marginBottom: 8,
+    color: '#FFFFFF',
   },
   currentLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#CCCCCC',
     marginBottom: 8,
     fontStyle: 'italic',
   },
@@ -154,6 +166,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginRight: 8,
+    backgroundColor: '#FFFFFF',
   },
   button: {
     paddingHorizontal: 8,
@@ -162,5 +175,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  emptyText: {
+    color: '#FFFFFF',
+    fontSize: 16,
   },
 });

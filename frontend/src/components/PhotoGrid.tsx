@@ -75,7 +75,7 @@ function PhotoItem({ item, getUri, onPress }: PhotoItemProps) {
             // Face cluster metadata
             <>
               <Text style={styles.clusterLabel}>
-                {item.label || `Cluster ${item.cluster_id}`}
+                {item.label || 'No name'}
               </Text>
               {item.photo_count && (
                 <Text style={styles.photoCountText}>
