@@ -32,14 +32,26 @@ type RootStackParamList = {
 type Props = NativeStackScreenProps<RootStackParamList, 'PhotoViewer'>;
 
 export default function PhotoViewer({ navigation, route }: Props) {
-  const { photo } = route.params;
+  const { photo } = route.params || {};
   const [details, setDetails] = React.useState<any>(photo);
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
+  // Handle case where photo is undefined
+  if (!photo) {
+    return (
+      <View style={styles.container}>
+        <AppHeader title="Photo not found" />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Photo not found</Text>
+        </View>
+      </View>
+    );
+  }
+
   React.useEffect(() => {
     // Only fetch details by id if we have a proper photo ID (not a filename)
-    const photoId = photo.id || photo.photo_id;
+    const photoId = photo?.id || photo?.photo_id;
 
     // Check if photoId looks like a filename (contains file extension)
     const isFilename =
@@ -55,7 +67,7 @@ export default function PhotoViewer({ navigation, route }: Props) {
           // If we can't fetch details, use the provided photo object
         });
     }
-  }, [photo.id, photo.photo_id]);
+  }, [photo?.id, photo?.photo_id]);
 
   // Use the photo utility to get the correct image URL
   const uri = getPhotoImageURL(photo);
@@ -75,7 +87,7 @@ export default function PhotoViewer({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      <AppHeader title={photo.filename} />
+      <AppHeader title={photo?.filename || 'Photo'} />
 
       <ScrollView
         style={styles.scrollView}

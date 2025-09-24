@@ -8,6 +8,7 @@ import {
   TextInput,
   Dimensions,
   Image,
+  SectionList,
 } from 'react-native';
 import { Text, useTheme, ActivityIndicator, Surface } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -28,12 +29,19 @@ interface Photo {
   relationships?: any[];
 }
 
+interface PhotoSection {
+  title: string;
+  subtitle: string;
+  data: Photo[];
+}
+
 
 
 const PicturesScreen = () => {
   const theme = useTheme();
   const navigation = useNavigation();
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photoSections, setPhotoSections] = useState<PhotoSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchMode, setSearchMode] = useState(false);
@@ -41,12 +49,79 @@ const PicturesScreen = () => {
   const [searchResults, setSearchResults] = useState<Photo[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
 
+  const groupPhotosByDate = (photos: Photo[]): PhotoSection[] => {
+    // Sort photos by timestamp (newest first)
+    const sortedPhotos = [...photos].sort((a, b) => b.timestamp - a.timestamp);
+    
+    const groups: { [key: string]: Photo[] } = {};
+    
+    sortedPhotos.forEach(photo => {
+      const date = new Date(photo.timestamp * 1000);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      let dateKey: string;
+      let subtitle: string;
+      
+      if (date.toDateString() === today.toDateString()) {
+        dateKey = 'Today';
+        subtitle = date.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        dateKey = 'Yesterday';
+        subtitle = date.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+      } else if (date.getFullYear() === today.getFullYear()) {
+        dateKey = date.toLocaleDateString('en-US', { 
+          month: 'long', 
+          day: 'numeric' 
+        });
+        subtitle = date.toLocaleDateString('en-US', { 
+          weekday: 'long' 
+        });
+      } else {
+        dateKey = date.toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+        subtitle = date.toLocaleDateString('en-US', { 
+          weekday: 'long' 
+        });
+      }
+      
+      const fullKey = `${dateKey}|${subtitle}`;
+      if (!groups[fullKey]) {
+        groups[fullKey] = [];
+      }
+      groups[fullKey].push(photo);
+    });
+    
+    return Object.entries(groups).map(([key, data]) => {
+      const [title, subtitle] = key.split('|');
+      return {
+        title,
+        subtitle,
+        data,
+      };
+    });
+  };
+
   const fetchPhotos = async () => {
     try {
       const response = await fetch(`${API_CONFIG.baseURL}/api/photos`);
       const data = await response.json();
       console.log('Photos API response:', data);
-      setPhotos(data.results || []);
+      const photosData = data.results || [];
+      setPhotos(photosData);
+      setPhotoSections(groupPhotosByDate(photosData));
     } catch (error) {
       console.error('Error fetching photos:', error);
       setPhotos([]);
@@ -106,8 +181,8 @@ const PicturesScreen = () => {
       <TouchableOpacity
         style={styles.photoContainer}
         onPress={() => {
-          // Simple navigation without type checking for now
-          (navigation as any).navigate('PhotoViewer', { photoId: item.id });
+          // Pass the complete photo object
+          (navigation as any).navigate('PhotoViewer', { photo: item });
         }}
       >
         <Image
@@ -116,6 +191,39 @@ const PicturesScreen = () => {
           resizeMode="cover"
         />
       </TouchableOpacity>
+    );
+  };
+
+  const renderSectionHeader = ({ section }: { section: PhotoSection }) => (
+    <View style={[styles.sectionHeader, { backgroundColor: theme.colors.background }]}>
+      <Text style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
+        {section.title}
+      </Text>
+      <Text style={[styles.sectionSubtitle, { color: theme.colors.onSurfaceVariant }]}>
+        {section.subtitle} • {section.data.length} photo{section.data.length !== 1 ? 's' : ''}
+      </Text>
+    </View>
+  );
+
+  const renderSectionData = ({ item, index, section }: { item: Photo; index: number; section: PhotoSection }) => {
+    // Only render every 3rd item to create rows
+    if (index % 3 !== 0) return null;
+    
+    // Get the current row of photos (up to 3)
+    const rowPhotos = section.data.slice(index, index + 3);
+    
+    return (
+      <View style={styles.photoRow}>
+        {rowPhotos.map((photo) => (
+          <View key={photo.id} style={styles.photoContainer}>
+            {renderPhoto({ item: photo })}
+          </View>
+        ))}
+        {/* Fill empty spaces if the row has less than 3 photos */}
+        {Array(3 - rowPhotos.length).fill(null).map((_, emptyIndex) => (
+          <View key={`empty-${index}-${emptyIndex}`} style={styles.photoContainer} />
+        ))}
+      </View>
     );
   };
 
@@ -203,47 +311,79 @@ const PicturesScreen = () => {
       )}
 
       {/* Photo Grid */}
-      <FlatList
-        data={searchMode ? searchResults : photos}
-        renderItem={renderPhoto}
-        numColumns={3}
-        contentContainerStyle={styles.gridContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={theme.colors.primary}
-            colors={[theme.colors.primary]}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={50}
-        windowSize={10}
-        initialNumToRender={30}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name={searchMode ? "magnify" : "image-outline"}
-              size={64}
-              color={theme.colors.onSurfaceVariant}
+      {searchMode ? (
+        <FlatList
+          data={searchResults}
+          renderItem={renderPhoto}
+          numColumns={3}
+          contentContainerStyle={styles.gridContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.primary}
+              colors={[theme.colors.primary]}
             />
-            <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
-              {searchMode ? 'No search results found' : 'No photos found'}
-            </Text>
-          </View>
-        }
-        ListFooterComponent={
-          searchLoading ? (
-            <View style={styles.searchLoadingContainer}>
-              <ActivityIndicator size="large" color={theme.colors.primary} />
-              <Text style={[styles.searchLoadingText, { color: theme.colors.onBackground }]}>
-                Searching...
+          }
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={50}
+          windowSize={10}
+          initialNumToRender={30}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons
+                name="magnify"
+                size={64}
+                color={theme.colors.onSurfaceVariant}
+              />
+              <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
+                No search results found
               </Text>
             </View>
-          ) : null
-        }
-      />
+          }
+          ListFooterComponent={
+            searchLoading ? (
+              <View style={styles.searchLoadingContainer}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={[styles.searchLoadingText, { color: theme.colors.onBackground }]}>
+                  Searching...
+                </Text>
+              </View>
+            ) : null
+          }
+        />
+      ) : (
+        <SectionList
+          sections={photoSections}
+          renderItem={renderSectionData}
+          renderSectionHeader={renderSectionHeader}
+          contentContainerStyle={styles.gridContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={theme.colors.primary}
+              colors={[theme.colors.primary]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          stickySectionHeadersEnabled={true}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons
+                name="image-outline"
+                size={64}
+                color={theme.colors.onSurfaceVariant}
+              />
+              <Text style={[styles.emptyText, { color: theme.colors.onSurfaceVariant }]}>
+                No photos found
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 };
@@ -291,19 +431,27 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   photoContainer: {
-    flex: 1,
-    margin: 2,
-    maxWidth: ITEM_SIZE,
+    width: ITEM_SIZE,
+    height: ITEM_SIZE,
+    marginHorizontal: 2,
   },
   photoImage: {
     width: ITEM_SIZE,
     height: ITEM_SIZE,
     borderRadius: 8,
   },
+  photoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+    paddingHorizontal: 16,
+  },
   sectionHeader: {
     width: '100%',
     paddingVertical: 16,
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   sectionTitle: {
     fontSize: 18,
