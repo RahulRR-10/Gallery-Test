@@ -5,6 +5,10 @@ This module provides a REST API wrapper around the existing CLI photo search fun
 All AI logic, database handling, and CLI functions remain intact and editable.
 """
 
+# Set matplotlib backend early to prevent GUI windows
+import matplotlib
+matplotlib.use('Agg')
+
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -350,7 +354,8 @@ async def search_photos(request: SearchRequest):
                     query=object_query,
                     limit=request.limit,
                     time_filter=time_filter_str,
-                    similarity_threshold=request.similarity_threshold
+                    similarity_threshold=request.similarity_threshold,
+                    show_visual=False
                 )
                 
                 search_method = "person_object_heavy"
@@ -365,35 +370,87 @@ async def search_photos(request: SearchRequest):
                     }
             
             
-            # Object-only search (requires models)
+            # Object-only search - try fast object search first
             elif parsed.object_terms or parsed.time_expressions:
-                # Load heavy models only when needed
-                searcher = get_photo_searcher()
-                
                 search_query = " ".join(parsed.object_terms) if parsed.object_terms else request.query
-                time_filter_str = parser.format_time_filter(parsed.time_expressions)
-                if request.time_filter:  # Preserve original time filter if provided
-                    time_filter_str = request.time_filter
                 
-                results = searcher.search_photos(
-                    query=search_query,
-                    limit=request.limit,
-                    show_results=False,
-                    time_filter=time_filter_str
-                )
+                # Try fast object search first (no models needed)
+                from fast_object_search import FastObjectSearch
+                fast_searcher = FastObjectSearch()
                 
-                search_method = "object_time_heavy" if parsed.time_expressions else "object_only_heavy"
+                # Check if it's a simple object query
+                single_object_terms = [term for term in search_query.split() if len(term) > 2]
+                fast_results = []
+                
+                if len(single_object_terms) == 1:
+                    # Single object term - use fast search
+                    fast_results = fast_searcher.search_by_object(single_object_terms[0], request.limit * 2)
+                    
+                if fast_results:
+                    # Filter by time if needed
+                    if parsed.time_expressions or request.time_filter:
+                        time_filter_str = parser.format_time_filter(parsed.time_expressions)
+                        if request.time_filter:
+                            time_filter_str = request.time_filter
+                        
+                        # Apply time filter (simplified for now)
+                        # TODO: Implement proper time filtering on fast results
+                        results = fast_results[:request.limit]
+                    else:
+                        results = fast_results[:request.limit]
+                    
+                    search_method = "object_fast_tag_search"
+                else:
+                    # Fallback to semantic search with models
+                    searcher = get_photo_searcher()
+                    
+                    time_filter_str = parser.format_time_filter(parsed.time_expressions)
+                    if request.time_filter:  # Preserve original time filter if provided
+                        time_filter_str = request.time_filter
+                    
+                    results = searcher.search_photos(
+                        query=search_query,
+                        limit=request.limit,
+                        show_results=False,
+                        time_filter=time_filter_str
+                    )
+                    
+                    search_method = "object_semantic_fallback"
             
             else:
-                # Fallback to regular semantic search (requires models)
-                searcher = get_photo_searcher()
-                results = searcher.search_photos(
-                    query=request.query,
-                    limit=request.limit,
-                    show_results=False,
-                    time_filter=request.time_filter
-                )
-                search_method = "semantic_fallback"
+                # Try fast object search first for simple queries
+                from fast_object_search import FastObjectSearch
+                fast_searcher = FastObjectSearch()
+                
+                # Check if it's a simple single-word object query
+                query_words = request.query.strip().lower().split()
+                if len(query_words) == 1 and len(query_words[0]) > 2:
+                    # Try fast object search first
+                    fast_results = fast_searcher.search_by_object(query_words[0], request.limit * 2)
+                    
+                    if fast_results:
+                        results = fast_results[:request.limit]
+                        search_method = "simple_object_tag_search"
+                    else:
+                        # Fallback to semantic search
+                        searcher = get_photo_searcher()
+                        results = searcher.search_photos(
+                            query=request.query,
+                            limit=request.limit,
+                            show_results=False,
+                            time_filter=request.time_filter
+                        )
+                        search_method = "semantic_fallback_after_tag_search"
+                else:
+                    # Multi-word or complex query - use semantic search
+                    searcher = get_photo_searcher()
+                    results = searcher.search_photos(
+                        query=request.query,
+                        limit=request.limit,
+                        show_results=False,
+                        time_filter=request.time_filter
+                    )
+                    search_method = "semantic_multi_word"
         
         # Handle legacy separate field searches (backward compatibility)
         elif request.person:
@@ -418,7 +475,8 @@ async def search_photos(request: SearchRequest):
                     query=request.query,
                     limit=request.limit,
                     time_filter=request.time_filter,
-                    similarity_threshold=request.similarity_threshold
+                    similarity_threshold=request.similarity_threshold,
+                    show_visual=False
                 )
                 search_method = "legacy_person_heavy"
             

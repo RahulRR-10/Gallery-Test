@@ -42,6 +42,8 @@ import numpy as np
 
 # For visualization
 try:
+    import matplotlib
+    matplotlib.use('Agg')  # Use non-interactive backend to prevent GUI windows
     import matplotlib.pyplot as plt
     import matplotlib.image as mpimg
     from matplotlib.patches import Rectangle
@@ -1523,7 +1525,7 @@ def rebuild_relationships(db_path: str):
     db.build_relationships_from_photos()
     print("✅ Rebuilt relationships")
 
-def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query: Optional[str], limit: int, time_filter: Optional[str], similarity_threshold: float = 0.7):
+def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query: Optional[str], limit: int, time_filter: Optional[str], similarity_threshold: float = 0.7, show_visual: bool = False):
     db = searcher.db
     cluster = db.get_cluster_by_label(person_label)
     if not cluster:
@@ -1570,7 +1572,7 @@ def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query
         # show console list and plot
         for i, r in enumerate(results[:limit], 1):
             print(f"\n{i}. 📸 {os.path.basename(r['path'])}")
-        if HAS_MATPLOTLIB and results:
+        if HAS_MATPLOTLIB and results and show_visual:
             searcher._display_results(results[:limit], f"Person: {person_label}")
         return results[:limit]
     
@@ -1636,7 +1638,7 @@ def search_with_person(searcher: UltimatePhotoSearcher, person_label: str, query
         print(f"{i}. 📸 {os.path.basename(r['path'])}")
         print(f"   🎯 Similarity: {r['similarity']:.3f}")
     
-    if HAS_MATPLOTLIB and top_results:
+    if HAS_MATPLOTLIB and top_results and show_visual:
         searcher._display_results(top_results, f"Person: {person_label} | {query or ''}")
     return top_results
 

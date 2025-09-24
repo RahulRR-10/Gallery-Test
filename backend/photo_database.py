@@ -528,6 +528,65 @@ class PhotoDatabase:
             print(f"❌ Error deleting photo {photo_id}: {e}")
             return False
     
+    def search_photos_by_objects(self, object_query: str, limit: int = 100) -> List[dict]:
+        """
+        Search photos by object tags directly from the database
+        
+        Args:
+            object_query: Object name to search for (e.g., "dog", "car", "person")
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of photo dictionaries with metadata
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Clean up the query term
+            clean_query = object_query.strip().lower()
+            
+            # Search for photos where objects column contains the query term
+            # Using LIKE with wildcards for partial matching
+            cursor.execute('''
+                SELECT id, path, timestamp, exif_timestamp, file_size, image_width, image_height, 
+                       created_date, exif_date, indexed_date, objects, faces, clip_embedding
+                FROM photos 
+                WHERE objects IS NOT NULL 
+                AND LOWER(objects) LIKE LOWER(?)
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ''', (f'%{clean_query}%', limit))
+            
+            rows = cursor.fetchall()
+            conn.close()
+            
+            results = []
+            for row in rows:
+                result = {
+                    'id': row[0],
+                    'path': row[1],
+                    'timestamp': row[2],
+                    'exif_timestamp': row[3],
+                    'file_size': row[4],
+                    'image_width': row[5],
+                    'image_height': row[6],
+                    'created_date': row[7],
+                    'exif_date': row[8],
+                    'indexed_date': row[9],
+                    'objects': row[10],
+                    'faces': row[11],
+                    'similarity': 1.0  # Direct object match gets high similarity
+                }
+                results.append(result)
+            
+            print(f"🎯 Found {len(results)} photos with object '{clean_query}'")
+            return results
+            
+        except Exception as e:
+            print(f"❌ Error searching photos by objects: {e}")
+            return []
+
     def get_database_stats(self) -> dict:
         """
         Get statistics about the database
