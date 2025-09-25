@@ -470,34 +470,100 @@ async def search_photos(request: SearchRequest):
                     search_method = "object_semantic_fallback"
             
             else:
-                # Try fast object search first for simple queries
-                from fast_object_search import FastObjectSearch
-                fast_searcher = FastObjectSearch()
+                # Enhanced contextual and scenario-based search
+                from contextual_search import contextual_engine
                 
-                # Check if it's a simple single-word object query
-                query_words = request.query.strip().lower().split()
-                if len(query_words) == 1 and len(query_words[0]) > 2:
-                    # Try fast object search first
-                    fast_results = fast_searcher.search_by_object(query_words[0], request.limit * 2)
+                # Analyze query for contextual/scenario information
+                contextual_query = contextual_engine.analyze_query(request.query)
+                
+                if contextual_query.confidence > 0.5:
+                    # High confidence contextual match - use enhanced search
+                    enhanced_terms = contextual_engine.generate_enhanced_search_terms(contextual_query)
+                    searcher = get_photo_searcher()
                     
-                    if fast_results:
-                        results = fast_results[:request.limit]
-                        search_method = "simple_object_tag_search"
-                    else:
-                        # Fallback to semantic search
-                        searcher = get_photo_searcher()
+                    # Try multiple search approaches and combine results
+                    all_results = []
+                    
+                    # 1. Object-based search for expected objects
+                    if contextual_query.expected_objects:
+                        from fast_object_search import FastObjectSearch
+                        fast_searcher = FastObjectSearch()
+                        
+                        for obj in contextual_query.expected_objects[:3]:  # Try top 3 objects
+                            obj_results = fast_searcher.search_by_object(obj, request.limit)
+                            if obj_results:
+                                # Add object relevance score
+                                for result in obj_results:
+                                    result['contextual_relevance'] = 0.8
+                                    result['match_reason'] = f"contains expected object: {obj}"
+                                all_results.extend(obj_results)
+                    
+                    # 2. Semantic search with enhanced terms
+                    for semantic_query in enhanced_terms["semantic_queries"][:2]:  # Try top 2 semantic queries
+                        semantic_results = searcher.search_photos(
+                            query=semantic_query,
+                            limit=request.limit // 2,
+                            show_results=False,
+                            time_filter=request.time_filter
+                        )
+                        if semantic_results:
+                            # Add semantic relevance score
+                            for result in semantic_results:
+                                result['contextual_relevance'] = result.get('similarity', 0.5) * 0.9
+                                result['match_reason'] = f"semantic match for: {semantic_query}"
+                            all_results.extend(semantic_results)
+                    
+                    # 3. Remove duplicates and sort by relevance
+                    seen_paths = set()
+                    unique_results = []
+                    for result in all_results:
+                        if result['path'] not in seen_paths:
+                            seen_paths.add(result['path'])
+                            unique_results.append(result)
+                    
+                    # Sort by contextual relevance
+                    unique_results.sort(key=lambda x: x.get('contextual_relevance', 0), reverse=True)
+                    results = unique_results[:request.limit]
+                    search_method = f"contextual_{contextual_query.scenario_type}"
+                    
+                    if not results:
+                        # Fallback to regular semantic search
                         results = searcher.search_photos(
                             query=request.query,
                             limit=request.limit,
                             show_results=False,
                             time_filter=request.time_filter
                         )
-                        search_method = "semantic_fallback_after_tag_search"
+                        search_method = "contextual_fallback_semantic"
                 else:
-                    # Multi-word or complex query - use semantic search
-                    searcher = get_photo_searcher()
-                    results = searcher.search_photos(
-                        query=request.query,
+                    # Low confidence - try fast object search first for simple queries
+                    from fast_object_search import FastObjectSearch
+                    fast_searcher = FastObjectSearch()
+                    
+                    # Check if it's a simple single-word object query
+                    query_words = request.query.strip().lower().split()
+                    if len(query_words) == 1 and len(query_words[0]) > 2:
+                        # Try fast object search first
+                        fast_results = fast_searcher.search_by_object(query_words[0], request.limit * 2)
+                        
+                        if fast_results:
+                            results = fast_results[:request.limit]
+                            search_method = "simple_object_tag_search"
+                        else:
+                            # Fallback to semantic search
+                            searcher = get_photo_searcher()
+                            results = searcher.search_photos(
+                                query=request.query,
+                                limit=request.limit,
+                                show_results=False,
+                                time_filter=request.time_filter
+                            )
+                            search_method = "semantic_fallback_after_tag_search"
+                    else:
+                        # Multi-word or complex query - use semantic search
+                        searcher = get_photo_searcher()
+                        results = searcher.search_photos(
+                            query=request.query,
                         limit=request.limit,
                         show_results=False,
                         time_filter=request.time_filter
