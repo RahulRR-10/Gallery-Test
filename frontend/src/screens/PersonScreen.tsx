@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text, TextInput, Button } from 'react-native-paper';
-import { useQueryClient } from '@tanstack/react-query';
-import { labelFaceCluster } from '../services/api';
+import { Text, TextInput, Button, ActivityIndicator } from 'react-native-paper';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { labelFaceCluster, getClusterPhotos } from '../services/api';
 import { getPhotoImageURL } from '../utils/photoUtils';
 import AppHeader from '../components/AppHeader';
 import PhotoGrid from '../components/PhotoGrid';
@@ -13,6 +13,13 @@ export default function PersonScreen({ navigation, route }: any) {
   const [name, setName] = useState('');
   const [isLabeling, setIsLabeling] = useState(false);
   const queryClient = useQueryClient();
+
+  // Fetch all photos for this cluster
+  const { data: clusterPhotosData, isLoading: photosLoading, error: photosError } = useQuery({
+    queryKey: ['clusterPhotos', cluster.cluster_id],
+    queryFn: () => getClusterPhotos(cluster.cluster_id),
+    retry: 1,
+  });
 
   const onLabel = async () => {
     if (!name.trim()) return;
@@ -45,7 +52,11 @@ export default function PersonScreen({ navigation, route }: any) {
 
   // Function to get the URI for a photo
   const getPhotoUri = (photo: any) => {
-    // For cluster photos, photo is just a string path
+    // For cluster photos from the new API, photo has path property
+    if (photo && photo.path) {
+      return getPhotoImageURL({ path: photo.path });
+    }
+    // For cluster photos, photo is just a string path (fallback)
     if (typeof photo === 'string') {
       return getPhotoImageURL({ path: photo });
     }
@@ -55,8 +66,20 @@ export default function PersonScreen({ navigation, route }: any) {
 
   // Handle photo selection
   const handlePhotoPress = (photo: any) => {
-    // Handle case where photo is just a string path (from clusters)
-    if (typeof photo === 'string') {
+    // Handle case where photo is from the new cluster photos API
+    if (photo && photo.id && photo.path) {
+      navigation.navigate('PhotoViewer', {
+        photoId: photo.id,
+        photo: {
+          id: photo.id,
+          filename: photo.filename,
+          path: photo.path,
+          photo_id: photo.id,
+        },
+      });
+    }
+    // Handle case where photo is just a string path (from clusters - fallback)
+    else if (typeof photo === 'string') {
       // Extract filename from path
       const filename = photo.split(/[/\\]/).pop() || photo;
 
@@ -123,9 +146,18 @@ export default function PersonScreen({ navigation, route }: any) {
         </View>
       </View>
 
-      {cluster.sample_photos && cluster.sample_photos.length > 0 ? (
+      {photosLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator animating={true} size="large" />
+          <Text style={styles.loadingText}>Loading photos...</Text>
+        </View>
+      ) : photosError ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Error loading photos: {photosError.message}</Text>
+        </View>
+      ) : clusterPhotosData && clusterPhotosData.photos && clusterPhotosData.photos.length > 0 ? (
         <PhotoGrid
-          data={cluster.sample_photos}
+          data={clusterPhotosData.photos}
           getUri={getPhotoUri}
           onPress={handlePhotoPress}
         />
@@ -180,5 +212,16 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#FFFFFF',
     fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginTop: 16,
   },
 });

@@ -154,13 +154,13 @@ class APIHelpers:
                     cluster_id = cluster_row[0]
                     label = cluster_row[1]
                     
-                    # Get sample photos for this cluster
+                    # Get sample photos for this cluster (sorted by EXIF date)
                     cursor.execute("""
                         SELECT p.path, f.photo_id
                         FROM faces f
                         JOIN photos p ON f.photo_id = p.id
                         WHERE f.cluster_id = ?
-                        ORDER BY p.timestamp DESC
+                        ORDER BY COALESCE(p.exif_timestamp, p.timestamp) DESC
                         LIMIT 5
                     """, (cluster_id,))
                     
@@ -196,6 +196,38 @@ class APIHelpers:
                 
         except Exception as e:
             logger.error(f"Error getting face clusters: {e}")
+            return []
+
+    def get_cluster_photos(self, cluster_id: str, limit: int = 1000) -> List[Dict[str, Any]]:
+        """Get all photos for a specific face cluster"""
+        try:
+            with self.get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Get all photos for this cluster (sorted by EXIF date)
+                cursor.execute("""
+                    SELECT DISTINCT p.id, p.path, COALESCE(p.exif_timestamp, p.timestamp) as display_timestamp
+                    FROM faces f
+                    JOIN photos p ON f.photo_id = p.id
+                    WHERE f.cluster_id = ?
+                    ORDER BY COALESCE(p.exif_timestamp, p.timestamp) DESC
+                    LIMIT ?
+                """, (cluster_id, limit))
+                
+                photos = []
+                for row in cursor.fetchall():
+                    photo = {
+                        "id": row[0],
+                        "path": row[1],
+                        "timestamp": row[2],
+                        "filename": os.path.basename(row[1])
+                    }
+                    photos.append(photo)
+                
+                return photos
+                
+        except Exception as e:
+            logger.error(f"Error getting cluster photos: {e}")
             return []
     
     def get_stats(self) -> Dict[str, int]:
@@ -239,10 +271,11 @@ class APIHelpers:
                 cursor = conn.cursor()
                 
                 # Use efficient pagination with LIMIT and OFFSET
+                # Sort by EXIF timestamp first, fallback to file timestamp
                 cursor.execute("""
-                    SELECT id, path, timestamp, objects
+                    SELECT id, path, COALESCE(exif_timestamp, timestamp) as display_timestamp, objects
                     FROM photos 
-                    ORDER BY timestamp DESC, id DESC
+                    ORDER BY COALESCE(exif_timestamp, timestamp) DESC, id DESC
                     LIMIT ? OFFSET ?
                 """, (limit, offset))
                 
@@ -267,7 +300,7 @@ class APIHelpers:
                     photo = {
                         "id": row[0],  # Keep as string (hash)
                         "path": row[1],
-                        "timestamp": row[2],  # Keep as integer
+                        "timestamp": row[2],  # This is now COALESCE(exif_timestamp, timestamp) - actual photo date
                         "objects": objects[:5],  # Limit to first 5 objects for performance
                         "similarity": 1.0  # Default for browsing
                     }
@@ -300,11 +333,11 @@ class APIHelpers:
                 search_term = f"%{query.lower()}%"
                 
                 cursor.execute("""
-                    SELECT id, path, timestamp, objects
+                    SELECT id, path, COALESCE(exif_timestamp, timestamp) as display_timestamp, objects
                     FROM photos 
                     WHERE LOWER(path) LIKE ? 
                        OR LOWER(objects) LIKE ?
-                    ORDER BY timestamp DESC
+                    ORDER BY COALESCE(exif_timestamp, timestamp) DESC
                     LIMIT ?
                 """, (search_term, search_term, limit))
                 

@@ -912,6 +912,32 @@ async def label_face_cluster_simple(request: LabelPersonRequest):
     api_helpers.label_face_cluster(request.cluster_id, request.name)
     return {"success": True}
 
+@app.get("/api/faces/clusters/{cluster_id}/photos")
+async def get_cluster_photos(cluster_id: str, limit: int = Query(1000, description="Maximum number of photos to return")):
+    """Get all photos for a specific face cluster"""
+    try:
+        photos = api_helpers.get_cluster_photos(cluster_id, limit)
+        
+        photo_responses = []
+        for photo in photos:
+            photo_responses.append({
+                "id": photo["id"],
+                "filename": os.path.basename(photo["path"]),
+                "path": photo["path"],
+                "photo_id": photo["id"],
+                "timestamp": photo.get("timestamp")
+            })
+        
+        return {
+            "cluster_id": cluster_id,
+            "photos": photo_responses,
+            "total": len(photo_responses)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting cluster photos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/groups")
 async def list_groups():
     """List people groups (family, friends)"""

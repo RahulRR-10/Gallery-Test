@@ -71,6 +71,17 @@ export const getFaceClusters = async () => {
 export const labelFaceCluster = async (cluster_id: string, name: string) =>
   (await api.post('/faces/label', { cluster_id, name })).data;
 
+export const getClusterPhotos = async (cluster_id: string, limit: number = 1000) => {
+  try {
+    const response = await api.get(`/faces/clusters/${cluster_id}/photos?limit=${limit}`);
+    console.log(`getClusterPhotos response for cluster ${cluster_id}:`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error('getClusterPhotos error:', error);
+    throw error;
+  }
+};
+
 export const createGroup = async (group_name: string, cluster_ids: string[]) =>
   (await api.post('/groups/create', { group_name, cluster_ids })).data;
 export const getGroups = async () => (await api.get('/groups')).data;
