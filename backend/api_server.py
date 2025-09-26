@@ -427,37 +427,87 @@ async def search_photos(request: SearchRequest):
                 search_query = " ".join(parsed.object_terms) if parsed.object_terms else request.query
                 
                 # Try fast object search first (no models needed)
-                from fast_object_search import FastObjectSearch
-                fast_searcher = FastObjectSearch()
-                
-                # Check if it's a simple object query
-                single_object_terms = [term for term in search_query.split() if len(term) > 2]
-                fast_results = []
-                
-                if len(single_object_terms) == 1:
-                    # Single object term - use fast search
-                    fast_results = fast_searcher.search_by_object(single_object_terms[0], request.limit * 2)
+                try:
+                    from fast_object_search import FastObjectSearch
+                    fast_searcher = FastObjectSearch()
                     
-                if fast_results:
-                    # Filter by time if needed
-                    if parsed.time_expressions or request.time_filter:
+                    # Check if it's a simple object query (single or multiple objects)
+                    object_terms = [term for term in search_query.split() if len(term) > 2 and term.lower() not in ['and', 'with', 'or']]
+                    fast_results = []
+                    
+                    if len(object_terms) == 1:
+                        # Single object term - use fast search
+                        fast_results = fast_searcher.search_by_object(object_terms[0], request.limit * 2)
+                        search_method = "object_fast_single_search"
+                    elif len(object_terms) > 1:
+                        # Multiple object terms - find photos that contain ALL objects
+                        all_photo_sets = []
+                        for obj_term in object_terms:
+                            obj_results = fast_searcher.search_by_object(obj_term, request.limit * 5)  # Get more results for intersection
+                            if obj_results:
+                                photo_paths = {result['path'] for result in obj_results}
+                                all_photo_sets.append((photo_paths, obj_results))
+                        
+                        if all_photo_sets:
+                            # Find intersection - photos that contain ALL objects
+                            common_paths = all_photo_sets[0][0]  # Start with first object's photos
+                            for photo_set, _ in all_photo_sets[1:]:
+                                common_paths = common_paths.intersection(photo_set)
+                            
+                            # Build results from common photos
+                            if common_paths:
+                                # Get full result objects for common paths
+                                path_to_result = {}
+                                for _, results in all_photo_sets:
+                                    for result in results:
+                                        if result['path'] in common_paths:
+                                            path_to_result[result['path']] = result
+                                
+                                fast_results = list(path_to_result.values())[:request.limit * 2]
+                                search_method = "object_fast_multiple_search"
+                            else:
+                                fast_results = []
+                                search_method = "object_fast_no_intersection"
+                        else:
+                            fast_results = []
+                            search_method = "object_fast_no_results"
+                    
+                    # Apply results and time filtering for both single and multiple object searches
+                    if fast_results:
+                        if parsed.time_expressions or request.time_filter:
+                            time_filter_str = parser.format_time_filter(parsed.time_expressions)
+                            if request.time_filter:
+                                time_filter_str = request.time_filter
+                            
+                            # Apply time filter (simplified for now)
+                            # TODO: Implement proper time filtering on fast results
+                            results = fast_results[:request.limit]
+                        else:
+                            results = fast_results[:request.limit]
+                    else:
+                        # No fast results, fallback to semantic search with models
+                        searcher = get_photo_searcher()
+                        
                         time_filter_str = parser.format_time_filter(parsed.time_expressions)
-                        if request.time_filter:
+                        if request.time_filter:  # Preserve original time filter if provided
                             time_filter_str = request.time_filter
                         
-                        # Apply time filter (simplified for now)
-                        # TODO: Implement proper time filtering on fast results
-                        results = fast_results[:request.limit]
-                    else:
-                        results = fast_results[:request.limit]
-                    
-                    search_method = "object_fast_tag_search"
-                else:
+                        results = searcher.search_photos(
+                            query=search_query,
+                            limit=request.limit,
+                            show_results=False,
+                            time_filter=time_filter_str
+                        )
+                        
+                        search_method = "object_semantic_fallback"
+                        
+                except Exception as e:
+                    logger.error(f"Fast object search failed: {e}")
                     # Fallback to semantic search with models
                     searcher = get_photo_searcher()
                     
                     time_filter_str = parser.format_time_filter(parsed.time_expressions)
-                    if request.time_filter:  # Preserve original time filter if provided
+                    if request.time_filter:
                         time_filter_str = request.time_filter
                     
                     results = searcher.search_photos(
@@ -467,7 +517,7 @@ async def search_photos(request: SearchRequest):
                         time_filter=time_filter_str
                     )
                     
-                    search_method = "object_semantic_fallback"
+                    search_method = "object_fast_search_failed_fallback"
             
             else:
                 # Enhanced contextual and scenario-based search
@@ -646,9 +696,11 @@ async def search_photos(request: SearchRequest):
             if isinstance(objects, str):
                 objects = [obj.strip() for obj in objects.split(",") if obj.strip()]
             
-            # Parse faces if it's a string
+            # Parse faces if it's a string or None
             faces = result.get("faces", [])
-            if isinstance(faces, str):
+            if faces is None:
+                faces = []
+            elif isinstance(faces, str):
                 try:
                     import json
                     faces = json.loads(faces)
@@ -662,7 +714,7 @@ async def search_photos(request: SearchRequest):
                 similarity_score=result.get("similarity", 0.0),
                 objects=objects,
                 faces=faces,
-                relationships=result.get("relationships", []),
+                relationships=result.get("relationships", []) or [],
                 timestamp=result.get("timestamp")
             )
             photo_responses.append(photo_response)
