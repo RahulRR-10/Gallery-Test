@@ -21,7 +21,7 @@ class LightweightPersonSearch:
         self.db_path = db_path
         self.db = PhotoDatabase(db_path)
     
-    def search_person_photos(self, person_label: str, limit: int = 10, time_filter: Optional[str] = None) -> List[Dict]:
+    def search_person_photos(self, person_label: str, limit: int = 1000, time_filter: Optional[str] = None) -> List[Dict]:
         """
         Search for photos of a specific person using only database queries
         

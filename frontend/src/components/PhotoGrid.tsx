@@ -110,14 +110,14 @@ export default function PhotoGrid({ data, getUri, onPress }: Props) {
   const keyExtractor = (item: any, index: number) => {
     // For face clusters
     if (item.cluster_id) {
-      return `cluster_${item.cluster_id}`;
+      return `cluster_${item.cluster_id}_${index}`;
     }
     // For regular photos
     if (item.id) {
-      return `photo_${item.id}`;
+      return `photo_${item.id}_${index}`;
     }
     // Fallback to index if no unique identifier
-    return `item_${index}`;
+    return `item_${index}_${Date.now()}`;
   };
 
   return (

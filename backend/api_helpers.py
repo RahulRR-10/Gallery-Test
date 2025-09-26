@@ -41,11 +41,17 @@ class APIHelpers:
                 if not result:
                     return None
                 
-                # Safely parse objects (comma-separated string, not JSON)
+                # Safely parse objects JSON
                 objects = []
                 if result[3]:  # If objects field is not None or empty
-                    # Parse as comma-separated string
-                    objects = [obj.strip() for obj in result[3].split(",") if obj.strip()]
+                    try:
+                        # Parse as JSON array of objects
+                        parsed_objects = json.loads(result[3])
+                        # Extract just the class names for simple display
+                        objects = [obj['class'] for obj in parsed_objects if isinstance(obj, dict) and 'class' in obj]
+                    except (json.JSONDecodeError, TypeError):
+                        # Fallback to comma-separated parsing for old data
+                        objects = [obj.strip() for obj in str(result[3]).split(",") if obj.strip()]
                 
                 photo = {
                     "id": result[0],  # Keep as string (hash)
@@ -343,11 +349,17 @@ class APIHelpers:
                 
                 photos = []
                 for row in cursor.fetchall():
-                    # Safely parse objects (comma-separated string, not JSON)
+                    # Safely parse objects JSON
                     objects = []
                     if row[3]:  # If objects field is not None or empty
-                        # Parse as comma-separated string
-                        objects = [obj.strip() for obj in row[3].split(",") if obj.strip()]
+                        try:
+                            # Parse as JSON array of objects
+                            parsed_objects = json.loads(row[3])
+                            # Extract just the class names for simple display
+                            objects = [obj['class'] for obj in parsed_objects if isinstance(obj, dict) and 'class' in obj]
+                        except (json.JSONDecodeError, TypeError):
+                            # Fallback to comma-separated parsing for old data
+                            objects = [obj.strip() for obj in str(row[3]).split(",") if obj.strip()]
                     
                     photo = {
                         "id": row[0],  # Keep as string (hash)

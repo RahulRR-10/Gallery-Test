@@ -358,6 +358,7 @@ const PicturesScreen = () => {
           sections={photoSections}
           renderItem={renderSectionData}
           renderSectionHeader={renderSectionHeader}
+          keyExtractor={(item, index) => `photo_${item.id}_${index}`}
           contentContainerStyle={styles.gridContent}
           refreshControl={
             <RefreshControl

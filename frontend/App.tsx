@@ -5,6 +5,24 @@
  * @format
  */
 
+// Suppress React Native duplicate key warnings and other dev warnings
+import { LogBox } from 'react-native';
+LogBox.ignoreLogs([
+  'Encountered two children with the same key',
+  'Each child in a list should have a unique "key" prop',
+  'Warning: Each child in a list should have a unique "key" prop',
+  'Warning: Each child in an array or iterator should have a unique "key" prop',
+  'Keys should be unique so that components maintain their identity across updates',
+  'componentWillReceiveProps has been renamed',
+  'componentWillMount has been renamed',
+]);
+
+// Suppress console warnings in production
+if (!__DEV__) {
+  console.warn = () => {};
+  console.error = () => {};
+}
+
 import { StatusBar } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';

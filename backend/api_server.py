@@ -577,7 +577,7 @@ async def search_photos(request: SearchRequest):
                 # Pure person search - use lightweight
                 lightweight_searcher = get_lightweight_person_search()
                 results = lightweight_searcher.search_person_photos(
-                    person_labels=[request.person],
+                    person_label=request.person,
                     limit=request.limit,
                     time_filter=request.time_filter
                 )
@@ -614,11 +614,11 @@ async def search_photos(request: SearchRequest):
             parser = IntelligentQueryParser()
             parsed = parser.parse_query(request.query)
             
-            if parsed["persons"] and not parsed["objects"]:
+            if parsed.person_labels and not parsed.object_terms:
                 # Person-only query - use lightweight
                 lightweight_searcher = get_lightweight_person_search()
                 results = lightweight_searcher.search_person_photos(
-                    person_labels=parsed["persons"],
+                    person_label=parsed.person_labels[0],
                     limit=request.limit,
                     time_filter=request.time_filter
                 )
