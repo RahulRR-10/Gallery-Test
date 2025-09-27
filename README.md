@@ -1,4 +1,4 @@
-# 🚀 AI-Powered Photo Gallery - Advanced Local Photo Management
+# 🚀Pixie - AI-Powered Photo Gallery - Advanced Local Photo Management
 
 ## 🤖 **Intelligent On-Device Photo System**
 
