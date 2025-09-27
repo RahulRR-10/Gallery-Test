@@ -16,7 +16,7 @@ const Config = {
     localPort: 8000,
     
     // Alternative: ngrok URL for external access
-    ngrokURL: 'https://99bbe5275a1f.ngrok-free.app',
+    ngrokURL: 'your-ngrok-url',
     
     timeout: 60000, // Increased to 60 seconds
   },
@@ -40,7 +40,7 @@ export const getAPIBaseURL = (): string => {
     // 1. Use ngrok URL if available (for external access)
     // 2. Fall back to local IP (for same network access)
     
-    if (ngrokURL && ngrokURL !== 'https://99bbe5275a1f.ngrok-free.app') {
+    if (ngrokURL && ngrokURL !== 'your-ngrok-url') {
       // Use ngrok if you've updated it with a real URL
       return ngrokURL;
     } else {
