@@ -145,8 +145,7 @@ Once the backend is running, visit `http://localhost:8000/docs` for:
 
 ### Demo Materials
 
-- **Demo Video:** [Link to be added]
-- **Live Demo URL:** [Link to be added]
+- **Demo Video:** [https://youtu.be/5mEDDtHzC_w?si=TXyqbg_8JFjJzdJK](https://youtu.be/5mEDDtHzC_w?si=TXyqbg_8JFjJzdJK)
 - **GitHub Repository:** [https://github.com/RahulRR-10/Gallery-Test](https://github.com/RahulRR-10/Gallery-Test)
 - **Documentation:** [Link to be added]
 - **Presentation Slides:** [Link to be added]
