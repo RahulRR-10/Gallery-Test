@@ -35,7 +35,7 @@
 - **AI Pipeline:** Local inference with optimized model loading
 - **Storage:** Local file system with metadata indexing
 
-## � Setup and Installation
+## 🔨 Setup and Installation
 
 ### Prerequisites
 
@@ -50,8 +50,8 @@ Ensure you have the following installed:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/RahulRR-10/Gallery-Test.git
-cd Gallery-Test
+git clone https://github.com/RahulRR-10/Kiddocare_RVCE_4_B.AmishaPai.git
+cd Kiddocare_RVCE_4_B.AmishaPai
 ```
 
 ### Step 2: Backend Setup
@@ -82,6 +82,9 @@ npm install
 # For iOS, install CocoaPods dependencies
 cd ios && pod install && cd ..
 ```
+
+Add your local IP address in `.env` file (create from `.envExample`).
+Optionally also add it into frontend/src/config/environment.ts
 
 ### Step 4: Download AI Models
 
@@ -124,7 +127,7 @@ npm run ios        # For iOS
 
 ### Add Photos for Processing
 
-1. Place your photos in the `backend/sample_photos/` directory
+1. Place your photos in the `backend/sample_photos/` directory (ensure they contain EXIF data)
 2. The auto-indexing system will automatically:
    - Detect new photos
    - Extract faces and generate embeddings
@@ -145,16 +148,15 @@ Once the backend is running, visit `http://localhost:8000/docs` for:
 
 ### Demo Materials
 
-- **Demo Video:** [https://youtu.be/5mEDDtHzC_w?si=TXyqbg_8JFjJzdJK](https://youtu.be/5mEDDtHzC_w?si=TXyqbg_8JFjJzdJK)
-- **GitHub Repository:** [https://github.com/RahulRR-10/Gallery-Test](https://github.com/RahulRR-10/Gallery-Test)
-- **Documentation:** [Link to be added]
-- **Presentation Slides:** [Link to be added]
+- **Demo Video:** [https://youtu.be/5mEDDtHzC_w](https://youtu.be/5mEDDtHzC_w)
+- **GitHub Repository:** [https://github.com/RahulRR-10/Kiddocare_RVCE_4_B.AmishaPai.git](https://github.com/RahulRR-10/Kiddocare_RVCE_4_B.AmishaPai.git)
+- **Supplementary Document:** [https://docs.google.com/document/d/1nonxLqfItLUBOJSJdzQjC6OZu2-Dbvk209_MkjsXBbc/edit?usp=sharing](https://docs.google.com/document/d/1nonxLqfItLUBOJSJdzQjC6OZu2-Dbvk209_MkjsXBbc/edit?usp=sharing)
+- **Presentation Slides:** [https://www.canva.com/design/DAGyphpqxc8/eQnkCYDO6u_apMiAT-2wnQ/edit?utm_content=DAGyphpqxc8&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton](https://www.canva.com/design/DAGyphpqxc8/eQnkCYDO6u_apMiAT-2wnQ/edit?utm_content=DAGyphpqxc8&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
 
 ### Project Resources
 
 - **Technical Architecture:** See `backend/API_README.md`
 - **Setup Guide:** See `backend/SETUP.md`
-- **Development Notes:** Available in repository issues/wiki
 
 ## � Project Structure
 
@@ -219,7 +221,7 @@ test_samsung/
 
 - Ensure photos are in `backend/sample_photos/` directory
 - Check file permissions on the photos directory
-- Verify supported image formats (JPG, PNG, BMP, TIFF, GIF)
+- Verify supported image formats (JPG, PNG, JPEG)
 
 **Backend startup errors:**
 
@@ -261,7 +263,7 @@ test_samsung/
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
